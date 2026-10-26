@@ -1,0 +1,32 @@
+{
+    "video_directories": [
+        "~/Movies",
+        "~/Downloads",
+        "~/Desktop"
+    ],
+    "devices": {
+        "TV (Xiaomi)": {
+            "host": "100.90.61.47",
+            "user": "",
+            "os_type": "android",
+            "player": "vlc",
+            "display": ""
+        },
+        "Raspberry Pi 3B": {
+            "host": "100.95.199.1",
+            "user": "raspberry",
+            "os_type": "linux",
+            "player": "vlc",
+            "display": ":0"
+        },
+        "MacBook Pro": {
+            "host": "100.108.212.124",
+            "user": "gtrujillo",
+            "os_type": "mac",
+            "player": "vlc",
+            "display": ""
+        }
+    },
+    "active_device": "TV (Xiaomi)",
+    "http_port": 8080
+}
