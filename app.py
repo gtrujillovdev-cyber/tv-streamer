@@ -5,7 +5,8 @@ from pathlib import Path
 from stream_manager import (
     load_config, save_config, get_tailscale_ip, get_local_lan_ip, get_tailscale_peers,
     scan_videos, get_thumbnail, StreamController, clean_title,
-    get_history, add_to_history, clear_history, discover_android_tvs
+    get_history, add_to_history, clear_history, discover_android_tvs,
+    wake_tv, test_tv_connection
 )
 
 st.set_page_config(
@@ -203,6 +204,36 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # Botones de Acción Rápida (Diagnóstico y Despertar)
+    col_diag, col_wake = st.columns(2)
+    if col_diag.button("🩺 Probar TV", help="Comprueba que la tele responde y está lista", use_container_width=True):
+        with st.spinner("Comprobando salud de la TV..."):
+            diag = test_tv_connection(active_dev_info)
+            st.session_state.last_diag = diag
+
+    if col_wake.button("⚡ Despertar", help="Enciende la pantalla o quita el reposo", use_container_width=True):
+        ok, msg = wake_tv(active_dev_info)
+        if ok:
+            st.session_state.last_message = ("success", msg)
+        else:
+            st.session_state.last_message = ("info", msg)
+        st.rerun()
+
+    if "last_diag" in st.session_state and st.session_state.last_diag:
+        d = st.session_state.last_diag
+        details_html = "".join([f"<li style='margin-bottom: 4px;'>{item}</li>" for item in d.get("details", [])])
+        st.markdown(f"""
+        <div style="background: #1e1e28; border: 1px solid #4f46e5; border-radius: 8px; padding: 10px; margin-bottom: 12px; font-size: 12px;">
+            <b>{d['message']}</b>
+            <ul style="padding-left: 16px; margin-top: 8px; margin-bottom: 4px;">
+                {details_html}
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Cerrar diagnóstico", use_container_width=True):
+            st.session_state.last_diag = None
+            st.rerun()
+
     # Auto-detección inteligente
     with st.expander("🔍 Auto-detectar Smart TVs"):
         if st.button("Buscar TVs en red (Cast & ADB)", use_container_width=True):
@@ -287,6 +318,65 @@ with st.sidebar:
 # ÁREA PRINCIPAL
 # ==========================================
 st.title("🎬 TV Streamer")
+
+# Asistente de Inicio Rápido (Adiós al cable HDMI)
+with st.expander("🧙 Asistente de Configuración Rápida (¡Adiós al cable HDMI!)", expanded=False):
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1e1e2f 0%, #292942 100%); border: 1px solid #6366f1; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px;">
+        <span style="font-size: 15px; font-weight: 700; color: #a5b4fc;">🔌 ¿Cansado de conectar el cable HDMI para ver una película?</span><br>
+        <span style="font-size: 13px; color: #cbd5e1;">Con TV Streamer puedes transmitir cualquier vídeo descargado en tu Mac directamente a tu tele, a pantalla completa y sin levantarte del sofá.</span>
+    </div>
+    """, unsafe_allow_html=True)
+    w_tab1, w_tab2, w_tab3 = st.tabs(["1. Tus Películas", "2. Tu Tele", "3. ¡Disfrutar!"])
+
+    with w_tab1:
+        st.markdown("**1. Selecciona dónde guardas tus películas descargadas:**")
+        w_cols = st.columns(3)
+        if w_cols[0].button("📥 Añadir Descargas", use_container_width=True):
+            p = str(Path.home() / "Downloads")
+            if p not in cfg["video_directories"]:
+                cfg["video_directories"].append(p)
+                save_config(cfg)
+                st.session_state.last_message = ("success", "Carpeta 'Descargas' añadida con éxito.")
+                st.rerun()
+        if w_cols[1].button("🎬 Añadir Películas", use_container_width=True):
+            p = str(Path.home() / "Movies")
+            if p not in cfg["video_directories"]:
+                cfg["video_directories"].append(p)
+                save_config(cfg)
+                st.session_state.last_message = ("success", "Carpeta 'Películas' añadida con éxito.")
+                st.rerun()
+        if w_cols[2].button("💻 Añadir Escritorio", use_container_width=True):
+            p = str(Path.home() / "Desktop")
+            if p not in cfg["video_directories"]:
+                cfg["video_directories"].append(p)
+                save_config(cfg)
+                st.session_state.last_message = ("success", "Carpeta 'Escritorio' añadida con éxito.")
+                st.rerun()
+
+    with w_tab2:
+        st.markdown("**2. Detecta tu tele automáticamente por Wi-Fi:**")
+        if st.button("🔍 Escanear mi salón ahora", type="primary", use_container_width=True):
+            with st.spinner("Buscando pantallas en la red Wi-Fi..."):
+                found = discover_android_tvs()
+                if found:
+                    for d_k, d_v in found.items():
+                        c_name = d_k.split("(")[0].strip()
+                        cfg["devices"][c_name] = d_v
+                        cfg["active_device"] = c_name
+                    save_config(cfg)
+                    st.session_state.last_message = ("success", f"¡Se han detectado y vinculado {len(found)} pantalla(s)!")
+                    st.rerun()
+                else:
+                    st.warning("No se detectaron pantallas. Asegúrate de que tu tele está encendida en el mismo Wi-Fi.")
+
+    with w_tab3:
+        st.markdown("""
+        **3. ¡Todo listo para transmitir!**
+        - Elige cualquier vídeo del catálogo y haz clic en **`▶️ Reproducir`**.
+        - Tu tele empezará a reproducir el vídeo en alta definición a pantalla completa.
+        - Puedes usar el **mando a distancia virtual** aquí mismo para pausar, subir el volumen o saltar ±10 segundos.
+        """)
 
 # Notificaciones
 if st.session_state.last_message:

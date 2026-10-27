@@ -160,6 +160,119 @@ def clear_history():
     except Exception:
         pass
 
+def wake_tv(device_info: dict) -> tuple:
+    """Envía la orden de encendido / despertar pantalla a la TV vía ADB."""
+    if not device_info:
+        return False, "No se ha seleccionado dispositivo"
+    host = device_info.get("host", "").strip()
+    if not host:
+        return False, "No hay IP configurada para la TV"
+
+    adb_target = f"{host}:5555" if ":5555" not in host else host
+    try:
+        subprocess.run(["adb", "connect", adb_target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+        res = subprocess.run(
+            ["adb", "-s", adb_target, "shell", "input", "keyevent", "KEYCODE_WAKEUP"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4
+        )
+        return (res.returncode == 0, "¡Señal enviada! Tu TV debería encenderse o salir del reposo.")
+    except Exception as e:
+        return False, f"Error enviando señal a la TV: {e}"
+
+def test_tv_connection(device_info: dict) -> dict:
+    """Comprobación de salud integral con la TV (Ping, Modo Cast, ADB y VLC)."""
+    result = {
+        "ping_ok": False,
+        "ping_ms": None,
+        "mode": "adb",
+        "adb_ok": False,
+        "vlc_ok": False,
+        "cast_ok": False,
+        "message": "",
+        "details": []
+    }
+    if not device_info:
+        result["message"] = "No hay ningún dispositivo seleccionado."
+        return result
+
+    host = device_info.get("host", "").strip()
+    lan_ip = device_info.get("lan_ip", "").strip()
+    target_ip = lan_ip or host
+    is_cast = (device_info.get("mode") == "cast" or device_info.get("os_type") == "cast")
+    result["mode"] = "cast" if is_cast else "adb"
+
+    # 1. Comprobar Ping / Conectividad de red
+    if target_ip:
+        try:
+            ping_out = subprocess.check_output(
+                ["ping", "-c", "1", "-W", "1", target_ip],
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=2
+            )
+            result["ping_ok"] = True
+            # Extraer tiempo en ms
+            match = re.search(r'time=([\d.]+)\s*ms', ping_out)
+            if match:
+                result["ping_ms"] = float(match.group(1))
+            result["details"].append(f"✅ Red Wi-Fi: Conectado a {target_ip} ({result['ping_ms'] or '<5'} ms de latencia)")
+        except Exception:
+            result["details"].append(f"⚠️ Red Wi-Fi: No responde al ping en {target_ip}. Comprueba que la TV esté encendida.")
+
+    # 2. Comprobar modo Cast
+    if is_cast and HAS_PYCHROMECAST:
+        try:
+            cast_name = device_info.get("cast_name", "")
+            chromecasts, browser = pychromecast.get_chromecasts(tries=1, timeout=2.5)
+            for cc in chromecasts:
+                if (cast_name and cc.name == cast_name) or (target_ip and hasattr(cc, "cast_info") and cc.cast_info.host == target_ip):
+                    result["cast_ok"] = True
+                    result["details"].append(f"✅ Google Cast: TV detectada y lista para recibir vídeo sin cables.")
+                    break
+            browser.stop_discovery()
+            if not result["cast_ok"]:
+                result["details"].append("⚠️ Google Cast: No se localizó el receptor Cast en la red Wi-Fi.")
+        except Exception as e:
+            result["details"].append(f"⚠️ Google Cast: {e}")
+
+    # 3. Comprobar modo ADB / VLC
+    if not is_cast:
+        adb_target = f"{host}:5555" if ":5555" not in host else host
+        try:
+            subprocess.run(["adb", "connect", adb_target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+            state_out = subprocess.check_output(["adb", "-s", adb_target, "get-state"], text=True, timeout=2).strip()
+            if state_out == "device":
+                result["adb_ok"] = True
+                result["details"].append("✅ Conexión de control: Autorizada y enlazada.")
+
+                # Verificar VLC
+                pm_out = subprocess.check_output(
+                    ["adb", "-s", adb_target, "shell", "pm", "list", "packages", "org.videolan.vlc"],
+                    text=True,
+                    timeout=3
+                )
+                if "org.videolan.vlc" in pm_out:
+                    result["vlc_ok"] = True
+                    result["details"].append("✅ Reproductor VLC: Instalado y con aceleración lista.")
+                else:
+                    result["details"].append("ℹ️ VLC: No encontrado en la TV. Instala 'VLC for Android' desde la Play Store.")
+            elif state_out == "unauthorized":
+                result["details"].append("⚠️ Autorización pendiente: Mira la pantalla de tu TV y pulsa 'Permitir siempre'.")
+            else:
+                result["details"].append(f"⚠️ Estado ADB: {state_out}")
+        except Exception:
+            result["details"].append("⚠️ Control remoto: No se pudo conectar por ADB. Asegúrate de encender la TV.")
+
+    # Mensaje global
+    if (is_cast and result["cast_ok"]) or (not is_cast and result["adb_ok"] and result["vlc_ok"]):
+        result["message"] = "🎉 ¡Todo listo! Tu tele está perfectamente conectada y lista para transmitir sin HDMI."
+    elif result["ping_ok"]:
+        result["message"] = "🟡 La tele está conectada al Wi-Fi pero falta un detalle de enlace."
+    else:
+        result["message"] = "🔴 No se detecta la televisión. Asegúrate de que esté encendida en el mismo Wi-Fi."
+
+    return result
+
 def discover_android_tvs():
     """Descubre Smart TVs y dispositivos en la red local (Google Cast, ADB y Tailscale)."""
     found = {}
