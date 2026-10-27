@@ -5,7 +5,15 @@
         "~/Desktop"
     ],
     "devices": {
-        "TV (Xiaomi)": {
+        "Smart TV (Google Cast)": {
+            "host": "192.168.1.150",
+            "cast_name": "Living Room TV",
+            "mode": "cast",
+            "os_type": "cast",
+            "player": "native",
+            "display": ""
+        },
+        "TV (Xiaomi VLC Pro)": {
             "host": "100.90.61.47",
             "lan_ip": "192.168.1.208",
             "user": "",

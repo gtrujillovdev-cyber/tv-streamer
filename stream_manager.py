@@ -8,6 +8,12 @@ import hashlib
 import re
 from pathlib import Path
 
+try:
+    import pychromecast
+    HAS_PYCHROMECAST = True
+except ImportError:
+    HAS_PYCHROMECAST = False
+
 CACHE_DIR = Path.home() / ".cache" / "tv-streamer"
 THUMBS_DIR = CACHE_DIR / "thumbs"
 HISTORY_FILE = CACHE_DIR / "history.json"
@@ -155,10 +161,30 @@ def clear_history():
         pass
 
 def discover_android_tvs():
-    """Descubre Smart TVs y dispositivos Android TV en la red local y Tailscale."""
+    """Descubre Smart TVs y dispositivos en la red local (Google Cast, ADB y Tailscale)."""
     found = {}
 
-    # 1. Chequear dispositivos ya conectados por ADB
+    # 1. Google Cast / Chromecast (Zero-Config, sin opciones de desarrollador)
+    if HAS_PYCHROMECAST:
+        try:
+            chromecasts, browser = pychromecast.get_chromecasts(tries=1, timeout=2.5)
+            for cc in chromecasts:
+                cast_name = cc.name or "Smart TV"
+                host = cc.cast_info.host if hasattr(cc, "cast_info") else ""
+                model = cc.model_name or "Google Cast"
+                found[f"Cast: {cast_name} ({model})"] = {
+                    "host": host,
+                    "cast_name": cast_name,
+                    "mode": "cast",
+                    "os_type": "cast",
+                    "player": "native",
+                    "type": "chromecast"
+                }
+            browser.stop_discovery()
+        except Exception:
+            pass
+
+    # 2. Chequear dispositivos ya conectados por ADB
     try:
         out = subprocess.check_output(["adb", "devices", "-l"], text=True, timeout=3)
         for line in out.splitlines()[1:]:
@@ -290,6 +316,7 @@ class StreamController:
         self.current_url = None
         self.current_port = None
         self.current_device = None
+        self.current_cast = None
 
     @classmethod
     def get_instance(cls):
@@ -298,11 +325,40 @@ class StreamController:
         return cls._instance
 
     def send_remote_key(self, key: str, device_info: dict = None):
-        """Envía comandos de control remoto multimedia a la TV vía ADB."""
+        """Envía comandos de control remoto multimedia (Chromecast o ADB)."""
         dev = device_info or self.current_device
         if not dev:
             return False, "No hay dispositivo seleccionado"
 
+        # Modo Google Cast
+        if self.current_cast:
+            try:
+                mc = self.current_cast.media_controller
+                if key in ("play_pause", "pause", "play"):
+                    if key == "pause" or (key == "play_pause" and mc.status.player_state == "PLAYING"):
+                        mc.pause()
+                    else:
+                        mc.play()
+                elif key == "rewind":
+                    cur = mc.status.current_time or 0
+                    mc.seek(max(0, cur - 10))
+                elif key == "fast_forward":
+                    cur = mc.status.current_time or 0
+                    mc.seek(cur + 10)
+                elif key == "vol_up":
+                    self.current_cast.volume_up()
+                elif key == "vol_down":
+                    self.current_cast.volume_down()
+                elif key == "mute":
+                    self.current_cast.set_volume_muted(not self.current_cast.status.is_volume_muted)
+                elif key in ("home", "stop"):
+                    mc.stop()
+                    self.current_cast.quit_app()
+                return True, f"Comando Cast: {key}"
+            except Exception as e:
+                return False, f"Error en control Cast: {e}"
+
+        # Modo ADB
         host = dev.get("host", "").strip()
         if not host:
             return False, "No se ha configurado la dirección IP del dispositivo"
@@ -340,6 +396,14 @@ class StreamController:
             return False, f"Error enviando comando: {e}"
 
     def stop_stream(self, device_info=None):
+        if self.current_cast:
+            try:
+                self.current_cast.media_controller.stop()
+                self.current_cast.quit_app()
+            except Exception:
+                pass
+            self.current_cast = None
+
         if self.server_proc:
             try:
                 self.server_proc.terminate()
@@ -380,11 +444,11 @@ class StreamController:
         if not vpath.exists():
             return False, f"El archivo '{video_path}' no existe."
 
+        is_cast = (device_info.get("mode") == "cast" or device_info.get("os_type") == "cast")
         host = device_info.get("host", "100.90.61.47").strip()
         lan_ip = device_info.get("lan_ip", "").strip()
 
-        # Selección inteligente de IP de streaming:
-        # Priorizar LAN directa si está disponible para 0 carga de CPU en la TV y máxima velocidad
+        # Selección inteligente de IP de streaming
         stream_ip = None
         candidate_lan = lan_ip or (host if not host.startswith("100.") else "192.168.1.208")
 
@@ -420,6 +484,45 @@ class StreamController:
         self.current_video = str(vpath)
         self.current_device = device_info
 
+        # MODO 1: GOOGLE CAST (Cero configuración, nativo)
+        if is_cast and HAS_PYCHROMECAST:
+            try:
+                cast_name = device_info.get("cast_name", "")
+                chromecasts, browser = pychromecast.get_chromecasts(tries=1, timeout=3)
+                target_cc = None
+                for cc in chromecasts:
+                    if (cast_name and cc.name == cast_name) or (host and hasattr(cc, "cast_info") and cc.cast_info.host == host):
+                        target_cc = cc
+                        break
+                browser.stop_discovery()
+
+                if not target_cc and chromecasts:
+                    target_cc = chromecasts[0]
+
+                if not target_cc:
+                    return False, f"No se encontró el dispositivo Cast '{cast_name or host}' en la red."
+
+                target_cc.wait()
+                mc = target_cc.media_controller
+                mc.play_media(stream_url, "video/mp4")
+                mc.block_until_active(timeout=5)
+                mc.play()
+                self.current_cast = target_cc
+
+                # Historial
+                try:
+                    st = vpath.stat()
+                    size_mb = round(st.st_size / (1024 * 1024), 1)
+                    size_str = f"{size_mb} MB" if size_mb < 1000 else f"{round(size_mb/1024, 2)} GB"
+                    add_to_history(str(vpath), size_str)
+                except Exception:
+                    add_to_history(str(vpath))
+
+                return True, stream_url
+            except Exception as e:
+                return False, f"Error transmitiendo por Google Cast: {e}"
+
+        # MODO 2: ADB + VLC (Modo Pro)
         adb_target = f"{host}:5555" if ":5555" not in host else host
 
         try:

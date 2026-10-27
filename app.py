@@ -179,27 +179,34 @@ with st.sidebar:
     dev_lan = active_dev_info.get("lan_ip", "")
 
     # Comprobación de estado del host
+    is_cast = active_dev_info.get("mode") == "cast" or active_dev_info.get("os_type") == "cast"
     is_online = False
     for p_name, p_data in ts_peers.items():
         if p_data.get("ip") == dev_host or p_name.lower() in selected_device_name.lower():
             is_online = p_data.get("online", False)
             break
 
-    status_color = "#22c55e" if is_online else "#eab308"
-    status_text = "🟢 En línea (Tailscale)" if is_online else "🟡 En espera / LAN Local"
+    if is_cast:
+        status_color = "#22c55e"
+        status_text = "🟢 Listo (Google Cast - Sin depuración)"
+        system_label = "Google Cast (Nativo)"
+    else:
+        status_color = "#22c55e" if is_online else "#eab308"
+        status_text = "🟢 En línea (Tailscale)" if is_online else "🟡 En espera / LAN Local"
+        system_label = f"{active_dev_info.get('os_type', 'android')} ({active_dev_info.get('player', 'vlc')})"
 
     st.markdown(f"""
     <div style="font-size: 12px; margin-bottom: 12px; line-height: 1.5;">
         <b>Estado:</b> <span style="color: {status_color}; font-weight: 600;">{status_text}</span><br>
         <b>Host / IP:</b> <code>{dev_host}</code> {f"(LAN: <code>{dev_lan}</code>)" if dev_lan else ""}<br>
-        <b>Sistema:</b> <code>{active_dev_info.get('os_type', 'android')}</code> ({active_dev_info.get('player', 'vlc')})
+        <b>Modo:</b> <code>{system_label}</code>
     </div>
     """, unsafe_allow_html=True)
 
     # Auto-detección inteligente
     with st.expander("🔍 Auto-detectar Smart TVs"):
-        if st.button("Buscar TVs en red y ADB", use_container_width=True):
-            with st.spinner("Escaneando red local y Tailscale..."):
+        if st.button("Buscar TVs en red (Cast & ADB)", use_container_width=True):
+            with st.spinner("Escaneando Google Cast, red local y Tailscale..."):
                 found = discover_android_tvs()
                 st.session_state.discovered_devices = found
 
@@ -220,17 +227,16 @@ with st.sidebar:
     with st.expander("⚙️ Configurar / Nuevo Dispositivo"):
         with st.form("device_form"):
             dev_name = st.text_input("Nombre (ej. Salón, Dormitorio)", value=selected_device_name)
-            dev_host_in = st.text_input("IP Tailscale o Hostname", value=dev_host)
+            dev_host_in = st.text_input("IP o Hostname", value=dev_host)
             dev_lan_in = st.text_input("IP LAN Local (Opcional, ej. 192.168.1.208)", value=dev_lan)
-            dev_os_in = st.selectbox(
-                "Sistema",
-                ["android", "linux", "mac"],
-                index=["android", "linux", "mac"].index(active_dev_info.get("os_type", "android"))
-            )
+            os_options = ["cast", "android", "linux", "mac"]
+            current_os = active_dev_info.get("os_type", "android")
+            os_idx = os_options.index(current_os) if current_os in os_options else 1
+            dev_os_in = st.selectbox("Modo / Sistema", os_options, index=os_idx, help="Elige 'cast' para Google Cast sin depuración, o 'android' para modo Pro con VLC")
             dev_player_in = st.selectbox(
                 "Reproductor",
-                ["vlc", "mpv"],
-                index=0 if active_dev_info.get("player") == "vlc" else 1
+                ["native", "vlc", "mpv"],
+                index=0 if active_dev_info.get("player") == "native" else (1 if active_dev_info.get("player") == "vlc" else 2)
             )
 
             if st.form_submit_button("Guardar Dispositivo"):
