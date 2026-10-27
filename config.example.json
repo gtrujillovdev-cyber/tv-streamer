@@ -7,6 +7,7 @@
     "devices": {
         "TV (Xiaomi)": {
             "host": "100.90.61.47",
+            "lan_ip": "192.168.1.208",
             "user": "",
             "os_type": "android",
             "player": "vlc",

@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  tv-streamer:
+    build: .
+    container_name: tv-streamer
+    network_mode: "host" # Para acceso directo a la LAN y Tailscale sin NAT
+    volumes:
+      - ./config.json:/app/config.json
+      - ~/Movies:/videos/Movies:ro
+      - ~/Downloads:/videos/Downloads:ro
+      - ~/.cache/tv-streamer:/root/.cache/tv-streamer
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

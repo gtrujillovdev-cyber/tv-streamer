@@ -4,10 +4,13 @@ import subprocess
 import json
 import time
 import socket
+import hashlib
+import re
 from pathlib import Path
 
 CACHE_DIR = Path.home() / ".cache" / "tv-streamer"
 THUMBS_DIR = CACHE_DIR / "thumbs"
+HISTORY_FILE = CACHE_DIR / "history.json"
 CONFIG_FILE = Path(__file__).parent / "config.json"
 VIDEO_SERVER_SCRIPT = Path(__file__).parent / "video_server.py"
 
@@ -20,6 +23,7 @@ DEFAULT_CONFIG = {
     "devices": {
         "TV (Xiaomi)": {
             "host": "100.90.61.47",
+            "lan_ip": "192.168.1.208",
             "user": "",
             "os_type": "android",
             "player": "vlc",
@@ -60,6 +64,23 @@ def get_tailscale_ip():
         pass
     return "100.108.32.67"
 
+def get_local_lan_ip(target_host: str = None) -> str:
+    """Detecta la IP local de este Mac en la red LAN hacia el host destino o el router."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        dest = target_host if (target_host and not target_host.startswith("100.")) else "192.168.1.1"
+        s.connect((dest, 80))
+        ip = s.getsockname()[0]
+        s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    try:
+        return socket.gethostbyname(socket.gethostname())
+    except Exception:
+        return "127.0.0.1"
+
 def get_tailscale_peers():
     peers = {}
     try:
@@ -80,6 +101,114 @@ def get_tailscale_peers():
     except Exception:
         pass
     return peers
+
+def clean_title(filename: str) -> str:
+    """Limpia nombres de archivos eliminando hashes, tags técnicos y formatos."""
+    name = Path(filename).stem
+    # Eliminar hashes o identificadores como #abc1234
+    name = re.sub(r'#[a-zA-Z0-9_-]+', '', name)
+    # Eliminar tags comunes como [1080p], (720p), [x264], [AAC], etc.
+    name = re.sub(r'\[.*?\]|\(.*?\)', '', name)
+    # Reemplazar puntos o guiones bajos por espacios
+    name = re.sub(r'[_.]+', ' ', name)
+    # Limpiar espacios repetidos
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name if name else Path(filename).stem
+
+def get_history() -> list:
+    """Recupera el historial de videos reproducidos recientemente."""
+    if not HISTORY_FILE.exists():
+        return []
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return [item for item in data if Path(item.get("path", "")).exists()]
+    except Exception:
+        return []
+
+def add_to_history(video_path: str, size_str: str = ""):
+    """Añade un video al historial de reproducción."""
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        history = get_history()
+        vpath = str(Path(video_path).resolve())
+        history = [h for h in history if str(Path(h.get("path", "")).resolve()) != vpath]
+        history.insert(0, {
+            "name": Path(video_path).name,
+            "title": clean_title(Path(video_path).name),
+            "path": vpath,
+            "size": size_str,
+            "played_at": int(time.time())
+        })
+        history = history[:12]
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=4, ensure_ascii=False)
+    except Exception:
+        pass
+
+def clear_history():
+    """Limpia el historial de reproducción."""
+    try:
+        if HISTORY_FILE.exists():
+            HISTORY_FILE.unlink()
+    except Exception:
+        pass
+
+def discover_android_tvs():
+    """Descubre Smart TVs y dispositivos Android TV en la red local y Tailscale."""
+    found = {}
+
+    # 1. Chequear dispositivos ya conectados por ADB
+    try:
+        out = subprocess.check_output(["adb", "devices", "-l"], text=True, timeout=3)
+        for line in out.splitlines()[1:]:
+            parts = line.split()
+            if len(parts) >= 2 and parts[1] == "device":
+                serial = parts[0]
+                model = "Android TV"
+                for p in parts[2:]:
+                    if p.startswith("model:"):
+                        model = p.split(":")[1].replace("_", " ")
+                host = serial.split(":")[0] if ":" in serial else serial
+                found[f"ADB: {model} ({host})"] = {
+                    "host": host,
+                    "os_type": "android",
+                    "player": "vlc",
+                    "type": "adb_connected"
+                }
+    except Exception:
+        pass
+
+    # 2. Tailscale peers
+    ts_peers = get_tailscale_peers()
+    for name, data in ts_peers.items():
+        if data.get("os") in ("android", "linux"):
+            found[f"Tailscale: {name}"] = {
+                "host": data.get("ip"),
+                "os_type": data.get("os", "android"),
+                "player": "vlc",
+                "type": "tailscale"
+            }
+
+    # 3. Escaneo rápido de mDNS de ADB si está disponible
+    try:
+        mdns_out = subprocess.check_output(["adb", "mdns", "services"], text=True, timeout=2)
+        for line in mdns_out.splitlines():
+            if "_adb-tls-connect._tcp" in line or "_adb._tcp" in line:
+                parts = line.split()
+                if len(parts) >= 3:
+                    ip_port = parts[2]
+                    ip = ip_port.split(":")[0]
+                    found[f"Auto-mDNS: Android TV ({ip})"] = {
+                        "host": ip,
+                        "os_type": "android",
+                        "player": "vlc",
+                        "type": "mdns"
+                    }
+    except Exception:
+        pass
+
+    return found
 
 def is_port_in_use(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -134,13 +263,16 @@ def scan_videos(directories, extensions=(".mp4", ".mkv", ".avi", ".mov", ".webm"
                             st = full_path.stat()
                             size_mb = round(st.st_size / (1024 * 1024), 1)
                             size_str = f"{size_mb} MB" if size_mb < 1000 else f"{round(size_mb/1024, 2)} GB"
+                            ext = full_path.suffix.lstrip(".").upper()
                             videos.append({
                                 "name": f,
+                                "title": clean_title(f),
                                 "path": str(full_path),
                                 "folder": str(Path(root)),
                                 "size": size_str,
                                 "size_bytes": st.st_size,
                                 "mtime": st.st_mtime,
+                                "ext": ext
                             })
                         except Exception:
                             continue
@@ -164,6 +296,48 @@ class StreamController:
         if cls._instance is None:
             cls._instance = StreamController()
         return cls._instance
+
+    def send_remote_key(self, key: str, device_info: dict = None):
+        """Envía comandos de control remoto multimedia a la TV vía ADB."""
+        dev = device_info or self.current_device
+        if not dev:
+            return False, "No hay dispositivo seleccionado"
+
+        host = dev.get("host", "").strip()
+        if not host:
+            return False, "No se ha configurado la dirección IP del dispositivo"
+
+        adb_target = f"{host}:5555" if ":5555" not in host else host
+
+        KEY_MAP = {
+            "play_pause": "KEYCODE_MEDIA_PLAY_PAUSE",
+            "play": "KEYCODE_MEDIA_PLAY",
+            "pause": "KEYCODE_MEDIA_PAUSE",
+            "rewind": "KEYCODE_MEDIA_REWIND",
+            "fast_forward": "KEYCODE_MEDIA_FAST_FORWARD",
+            "vol_up": "KEYCODE_VOLUME_UP",
+            "vol_down": "KEYCODE_VOLUME_DOWN",
+            "mute": "KEYCODE_VOLUME_MUTE",
+            "home": "KEYCODE_HOME",
+            "back": "KEYCODE_BACK",
+            "left": "KEYCODE_DPAD_LEFT",
+            "right": "KEYCODE_DPAD_RIGHT",
+            "up": "KEYCODE_DPAD_UP",
+            "down": "KEYCODE_DPAD_DOWN",
+            "select": "KEYCODE_DPAD_CENTER",
+        }
+
+        target_key = KEY_MAP.get(key, key)
+        try:
+            res = subprocess.run(
+                ["adb", "-s", adb_target, "shell", "input", "keyevent", target_key],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=3
+            )
+            return res.returncode == 0, f"Enviado {key}"
+        except Exception as e:
+            return False, f"Error enviando comando: {e}"
 
     def stop_stream(self, device_info=None):
         if self.server_proc:
@@ -206,12 +380,24 @@ class StreamController:
         if not vpath.exists():
             return False, f"El archivo '{video_path}' no existe."
 
-        # Seleccionar la mejor IP: LAN local si estamos en casa (más rápida y sin consumo de CPU) o Tailscale
-        try:
-            lan_check = subprocess.run(["ping", "-c", "1", "-W", "1", "192.168.1.208"],
-                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            stream_ip = "192.168.1.205" if lan_check.returncode == 0 else get_tailscale_ip()
-        except Exception:
+        host = device_info.get("host", "100.90.61.47").strip()
+        lan_ip = device_info.get("lan_ip", "").strip()
+
+        # Selección inteligente de IP de streaming:
+        # Priorizar LAN directa si está disponible para 0 carga de CPU en la TV y máxima velocidad
+        stream_ip = None
+        candidate_lan = lan_ip or (host if not host.startswith("100.") else "192.168.1.208")
+
+        if candidate_lan:
+            try:
+                lan_check = subprocess.run(["ping", "-c", "1", "-W", "1", candidate_lan],
+                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if lan_check.returncode == 0:
+                    stream_ip = get_local_lan_ip(candidate_lan)
+            except Exception:
+                pass
+
+        if not stream_ip or stream_ip.startswith("127."):
             stream_ip = get_tailscale_ip()
 
         available_port = get_available_port(port)
@@ -234,14 +420,13 @@ class StreamController:
         self.current_video = str(vpath)
         self.current_device = device_info
 
-        host = device_info.get("host", "100.90.61.47").strip()
         adb_target = f"{host}:5555" if ":5555" not in host else host
 
         try:
             # 1. Conectar ADB
             subprocess.run(["adb", "connect", adb_target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4)
 
-            # 2. Despertar la Xiaomi TV y limpiar instancias previas
+            # 2. Despertar la TV y limpiar instancias previas
             subprocess.run(["adb", "-s", adb_target, "shell", "input", "keyevent", "KEYCODE_WAKEUP"],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
             subprocess.run(["adb", "-s", adb_target, "shell", "am", "force-stop", "org.videolan.vlc"],
@@ -270,6 +455,15 @@ class StreamController:
             subprocess.run(["adb", "-s", adb_target, "shell", "input", "keyevent", "KEYCODE_MEDIA_PLAY"],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
 
+            # 5. Registrar en historial
+            try:
+                st = vpath.stat()
+                size_mb = round(st.st_size / (1024 * 1024), 1)
+                size_str = f"{size_mb} MB" if size_mb < 1000 else f"{round(size_mb/1024, 2)} GB"
+                add_to_history(str(vpath), size_str)
+            except Exception:
+                add_to_history(str(vpath))
+
             return True, stream_url
         except Exception as e:
-            return False, f"Error comunicando con Xiaomi TV: {e}"
+            return False, f"Error comunicando con la TV: {e}"

@@ -46,8 +46,13 @@ flowchart LR
 ## 🌟 Características Principales
 
 - ⚡ **Zero-Touch Playback:** Envía órdenes automáticas por **ADB (Android)** o **SSH (Linux/Mac)** para despertar la pantalla, esquivar el salvapantallas y abrir el reproductor a pantalla completa sin usar el mando a distancia.
+- 🎮 **Mando a Distancia Virtual en la Web:** Controla la reproducción desde tu móvil o portátil en tiempo real: Play/Pausa, saltos de $\pm 10$ segundos, control de volumen, silencio, botón inicio y detención inmediata.
+- ⏱️ **Historial y Continuar Viendo:** Acceso directo a los últimos vídeos transmitidos para reanudarlos con un solo clic.
+- 🏷️ **Títulos Limpios y Badges Informativos:** Formateo inteligente de nombres de archivo eliminando hashes y tags técnicos, con distintivos visuales de formato (`MP4`, `MKV`), tamaño y carpeta.
+- 🔍 **Búsqueda, Filtros y Ordenación:** Filtrado instantáneo por texto, extensión de archivo y tamaño (cortos vs películas/series $\ge 500\text{ MB}$), con ordenación por fecha o nombre.
+- 🚀 **Reproducción Directa (Drag & Drop):** Pega cualquier ruta o archivo externo para transmitirlo de inmediato sin necesidad de moverlo a las carpetas indexadas.
 - 🎯 **Enrutamiento Inteligente LAN vs. Tailscale:** 
-  - Si estás en casa en la misma red Wi-Fi (`192.168.1.x`), transmite por IP local directa, reduciendo a cero el consumo de CPU de la tele (sin descifrado WireGuard).
+  - Si estás en casa en la misma red Wi-Fi, transmite por IP local directa, reduciendo a cero el consumo de CPU de la tele (sin descifrado WireGuard).
   - Si estás fuera de casa, conmuta automáticamente a la red cifrada de **Tailscale** (`100.x.x.x`).
 - 🚀 **Servidor HTTP 206 Multihilo (Range Requests):**
   - Implementado con `socketserver.ThreadingMixIn` para permitir múltiples conexiones concurrentes (necesario para leer el índice `moov atom` de archivos MP4).
@@ -55,10 +60,8 @@ flowchart LR
 - 🔊 **Corrección de Desacople Audio/Video:**
   - Resuelve el desfase de 1.5s típico de videos **H.264 con B-Frames** y audio AAC 44.1 kHz en chips MediaTek mediante el motor **AudioTrack** y control de `clock-jitter`.
   - Buffer de red de **4 segundos (`network-caching = 4000`)** para absorber fluctuaciones de Wi-Fi.
-- 🍏 **Integración Nativa con macOS:**
-  - Paquete `.app` con icono personalizado para el **Launchpad** y Dock.
-  - Atajos de terminal (`tv`, `tvstreamer`, `tv-stop`).
-  - Extracción automática de carátulas/miniaturas en tiempo real con `ffmpeg`.
+- 🍏 **Integración Nativa con macOS & Multiplataforma:**
+  - Instalador universal en una línea (`install.sh`), paquete `.app` para Launchpad y Docker para NAS.
 
 ---
 
@@ -78,26 +81,37 @@ tv-streamer/
 
 ---
 
-## 🛠️ Instalación y Requisitos
+## 🛠️ Instalación Rápida
 
-### 1. Requisitos Previos
+### Opción 1: Instalador Automático en 1 Línea (Recomendado)
 
-- **macOS** (Optimizado para Apple Silicon M1/M2/M3/M4).
-- **Python 3.10+**.
-- **ADB (`android-platform-tools`)**:
-  ```bash
-  brew install android-platform-tools ffmpeg
-  ```
-- **Android TV / Xiaomi TV:**
-  - Activar **Opciones para desarrolladores** $\rightarrow$ **Depuración por red (ADB)**.
-  - Instalar **VLC for Android** desde la Google Play Store.
-
-### 2. Clonar e Instalar Dependencias
+En tu Mac o Linux, simplemente ejecuta:
 
 ```bash
-git clone https://github.com/gtrujillovdev-cyber/tv-streamer.git
-cd tv-streamer
-pip install -r requirements.txt
+curl -fsSL https://raw.githubusercontent.com/gtrujillovdev-cyber/tv-streamer/main/install.sh | bash
+```
+
+Esto instalará automáticamente las dependencias, configurará los accesos directos `tv` y creará la aplicación nativa en tu Launchpad.
+
+Para una guía detallada sobre cómo configurar cualquier televisión y usar la app desde el móvil, consulta la [Guía de Configuración Global](docs/GLOBAL_SETUP.md).
+
+### Opción 2: Instalación Manual
+
+1. **Requisitos Previos:**
+   - **Python 3.10+**.
+   - **ADB (`android-platform-tools`)** y **ffmpeg**:
+     ```bash
+     brew install android-platform-tools ffmpeg
+     ```
+   - **Android TV / Smart TV:** Activar Opciones para desarrolladores $\rightarrow$ Depuración por red (ADB). Instalar VLC for Android.
+
+2. **Clonar e Iniciar:**
+   ```bash
+   git clone https://github.com/gtrujillovdev-cyber/tv-streamer.git
+   cd tv-streamer
+   pip install -r requirements.txt
+   ./run.sh
+   ```
 cp config.example.json config.json
 ```
 
