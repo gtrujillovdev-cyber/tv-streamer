@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#07090e" id="metaThemeColor">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Mando Universal TV - Edición Alta Fidelidad</title>
+  <script>
+    /* Inmediata resolución del tema antes del renderizado (cero parpadeos) */
+    (function() {
+      try {
+        var modo = localStorage.getItem('mando_theme') || 'auto';
+        var mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+        var sistemaOscuro = mql ? mql.matches : false;
+        var efectivo = (modo === 'auto') ? (sistemaOscuro ? 'dark' : 'light') : modo;
+        document.documentElement.className = 'theme-' + efectivo + (efectivo === 'dark' ? ' dark' : '');
+        document.documentElement.setAttribute('data-theme-mode', modo);
+        var meta = document.getElementById('metaThemeColor');
+        if (meta) meta.setAttribute('content', efectivo === 'light' ? '#f1f5f9' : '#07090e');
+      } catch(e) {}
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = { darkMode: 'class' };
+    }
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* =======================================================================
+       TEMA CLARO: ALTO CONTRASTE BRAUN / APPLE / SONY HI-FI SILVER
+       Diseñado para máxima legibilidad bajo el sol y luz ambiente intensa
+       ======================================================================= */
+    html.theme-light {
+      --bg-body: #f1f5f9;
+      --theme-meta: #f1f5f9;
+      --chassis-bg: linear-gradient(180deg, #ffffff 0%, #f1f5f9 45%, #e2e8f0 100%);
+      --chassis-shadow: inset 0 1px 0 #ffffff, 0 4px 20px rgba(0, 0, 0, 0.08);
+
+      --lcd-bg: #dcfce7;
+      --lcd-border: #4ade80;
+      --lcd-text: #064e3b;
+      --lcd-dim: #15803d;
+      --lcd-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08), 0 1px 0 rgba(255, 255, 255, 0.9);
+
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+      --btn-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 55%, #e2e8f0 100%);
+      --btn-border: #cbd5e1;
+      --btn-border-bot: #94a3b8;
+      --btn-text: #0f172a;
+      --btn-text-sub: #334155;
+      --btn-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), inset 0 1px 0 #ffffff;
+
+      --dpad-bezel-bg: radial-gradient(circle at 50% 50%, #ffffff 0%, #e2e8f0 70%, #cbd5e1 100%);
+      --dpad-bezel-border: #94a3b8;
+      --dpad-key-bg: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+      --dpad-key-border: #cbd5e1;
+      --dpad-key-text: #0f172a;
+
+      --rocker-bg: #e2e8f0;
+      --rocker-border: #cbd5e1;
+
+      --selector-bar-bg: #e2e8f0;
+      --selector-bar-border: #cbd5e1;
+      --selector-tab-inactive: #1e293b;
+
+      --input-bg: #ffffff;
+      --input-border: #cbd5e1;
+      --input-text: #0f172a;
+      --input-placeholder: #64748b;
+
+      --slider-track: #cbd5e1;
+      --slider-thumb: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+      --slider-thumb-border: #64748b;
+
+      --divider: #cbd5e1;
+      --footer-text: #334155;
+      --plat-inactive-bg: #ffffff;
+      --plat-inactive-border: #cbd5e1;
+      --plat-inactive-text: #1e293b;
+    }
+
+    /* =======================================================================
+       TEMA OSCURO: ALTO CONTRASTE RETRO OLED / HI-FI PRO
+       Negros profundos con bordes marcados y tipografía en blanco nítido
+       ======================================================================= */
+    html.theme-dark {
+      --bg-body: #07090e;
+      --theme-meta: #07090e;
+      --chassis-bg: linear-gradient(180deg, #161c28 0%, #0d111a 40%, #07090f 100%);
+      --chassis-shadow: inset 0 0 40px rgba(0, 0, 0, 0.9);
+
+      --lcd-bg: #030a05;
+      --lcd-border: #14532d;
+      --lcd-text: #4ade80;
+      --lcd-dim: #22c55e;
+      --lcd-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.95), 0 1px 0 rgba(255, 255, 255, 0.08);
+
+      --card-bg: #0b0f17;
+      --card-border: #334155;
+      --card-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7);
+
+      --btn-bg: linear-gradient(180deg, #242c3d 0%, #171d29 65%, #10141d 100%);
+      --btn-border: #38455d;
+      --btn-border-bot: #0a0d14;
+      --btn-text: #ffffff;
+      --btn-text-sub: #cbd5e1;
+      --btn-shadow: 0 3px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+
+      --dpad-bezel-bg: radial-gradient(circle at 50% 50%, #1e2637 0%, #121723 60%, #090c13 100%);
+      --dpad-bezel-border: #334155;
+      --dpad-key-bg: linear-gradient(180deg, #283348 0%, #171d2a 100%);
+      --dpad-key-border: #3b4861;
+      --dpad-key-text: #ffffff;
+
+      --rocker-bg: #0d121b;
+      --rocker-border: #334155;
+
+      --selector-bar-bg: #090d14;
+      --selector-bar-border: #334155;
+      --selector-tab-inactive: #94a3b8;
+
+      --input-bg: #0a0e16;
+      --input-border: #334155;
+      --input-text: #ffffff;
+      --input-placeholder: #64748b;
+
+      --slider-track: #151d2a;
+      --slider-thumb: linear-gradient(180deg, #64748b 0%, #334155 100%);
+      --slider-thumb-border: #94a3b8;
+
+      --divider: #1e293b;
+      --footer-text: #94a3b8;
+      --plat-inactive-bg: #111622;
+      --plat-inactive-border: #1f2738;
+      --plat-inactive-text: #cbd5e1;
+    }
+
+    html, body {
+      background-color: var(--bg-body) !important;
+      color: var(--btn-text);
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-overscroll-behavior: none;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* CHASIS RETRO AJUSTADO A 100dvh SIN DESBORDES */
+    .retro-chassis {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding-top: max(var(--sat), 4px);
+      padding-bottom: max(var(--sab), 6px);
+      padding-left: 10px;
+      padding-right: 10px;
+      background: var(--chassis-bg);
+      box-shadow: var(--chassis-shadow);
+      transition: background 0.2s ease;
+    }
+
+    /* PANTALLA LCD RETRO DE FÓSFORO Y ALTO CONTRASTE */
+    .retro-lcd {
+      background: var(--lcd-bg);
+      border: 1.5px solid var(--lcd-border);
+      border-radius: 10px;
+      box-shadow: var(--lcd-shadow);
+      font-family: ui-monospace, "SF Mono", "Courier New", monospace;
+      color: var(--lcd-text);
+      transition: all 0.2s ease;
+    }
+
+    /* BOTONES TÁCTILES RETRO BRAUN / SONY */
+    .btn-retro {
+      background: var(--btn-bg);
+      border-top: 1px solid var(--btn-border);
+      border-left: 1px solid var(--btn-border);
+      border-right: 1px solid var(--btn-border);
+      border-bottom: 2px solid var(--btn-border-bot);
+      color: var(--btn-text);
+      box-shadow: var(--btn-shadow);
+      transition: all 0.04s ease;
+      touch-action: manipulation;
+    }
+    .btn-retro:active {
+      transform: translateY(2px);
+      border-bottom-width: 1px;
+      filter: brightness(1.15);
+    }
+
+    /* BOTÓN ENCENDIDO (VERDE VIBRANTE) */
+    .btn-power-on {
+      background: linear-gradient(180deg, #10b981 0%, #059669 65%, #047857 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.4);
+      border-bottom: 2px solid #064e3b;
+      box-shadow: 0 3px 8px rgba(16, 185, 129, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+    }
+    .btn-power-on:active { transform: translateY(2px); filter: brightness(1.2); }
+
+    /* BOTÓN APAGADO (ROJO VIBRANTE) */
+    .btn-power-off {
+      background: linear-gradient(180deg, #f43f5e 0%, #e11d48 65%, #be123c 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.4);
+      border-bottom: 2px solid #881337;
+      box-shadow: 0 3px 8px rgba(225, 29, 72, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+    }
+    .btn-power-off:active { transform: translateY(2px); filter: brightness(1.2); }
+
+    /* SELECTOR MULTI-TV */
+    .retro-selector-bar {
+      background: var(--selector-bar-bg);
+      border: 1.5px solid var(--selector-bar-border);
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+    .retro-tab {
+      color: var(--selector-tab-inactive);
+      font-weight: 800;
+      transition: all 0.15s ease;
+    }
+    .retro-tab.active {
+      background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+      color: #ffffff !important;
+      font-weight: 900;
+      border-radius: 9px;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+
+    /* SLIDERS TIPO MESA DE MEZCLAS RETRO */
+    .retro-sliders-box {
+      background: var(--card-bg);
+      border: 1.5px solid var(--card-border);
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
+      transition: all 0.2s ease;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--slider-track);
+      border: 1px solid var(--card-border);
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      background: var(--slider-thumb);
+      border: 1.5px solid var(--slider-thumb-border);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+      cursor: pointer;
+    }
+    .slider-vol::-webkit-slider-thumb {
+      background: linear-gradient(180deg, #a855f7 0%, #7e22ce 100%);
+      border: 1.5px solid #d8b4fe;
+      box-shadow: 0 2px 6px rgba(168, 85, 247, 0.6);
+    }
+
+    /* CRUCETA D-PAD RETRO SONY / HI-FI */
+    .retro-dpad-bezel {
+      position: relative;
+      width: 198px;
+      height: 198px;
+      border-radius: 9999px;
+      background: var(--dpad-bezel-bg);
+      border: 2px solid var(--dpad-bezel-border);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), inset 0 2px 3px rgba(255, 255, 255, 0.2), inset 0 -3px 8px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+    .dpad-key {
+      position: absolute;
+      background: var(--dpad-key-bg);
+      border: 1px solid var(--dpad-key-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--dpad-key-text);
+      font-size: 18px;
+      font-weight: 900;
+      transition: all 0.04s ease;
+      touch-action: manipulation;
+    }
+    .dpad-key:active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #3b82f6;
+      transform: scale(0.93);
+    }
+    .dpad-k-up {
+      top: 6px;
+      width: 76px;
+      height: 52px;
+      border-radius: 26px 26px 8px 8px;
+    }
+    .dpad-k-down {
+      bottom: 6px;
+      width: 76px;
+      height: 52px;
+      border-radius: 8px 8px 26px 26px;
+    }
+    .dpad-k-left {
+      left: 6px;
+      width: 52px;
+      height: 76px;
+      border-radius: 26px 8px 8px 26px;
+    }
+    .dpad-k-right {
+      right: 6px;
+      width: 52px;
+      height: 76px;
+      border-radius: 8px 26px 26px 8px;
+    }
+    .dpad-k-center {
+      z-index: 10;
+      width: 70px;
+      height: 70px;
+      border-radius: 9999px;
+      font-size: 16px;
+      font-weight: 900;
+      color: #ffffff;
+      background: radial-gradient(circle at 35% 35%, #3b82f6 0%, #1d4ed8 70%, #172554 100%);
+      box-shadow: 0 4px 12px rgba(29, 78, 216, 0.6), inset 0 2px 2px rgba(255, 255, 255, 0.4), inset 0 -2px 5px rgba(0, 0, 0, 0.8);
+      border: 1.5px solid rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dpad-k-center:active {
+      transform: scale(0.92);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.95);
+      background: #1e40af;
+    }
+
+    /* MÓDULOS VERTICALES ROCKER (VOLUMEN Y CANALES) */
+    .retro-rocker-mod {
+      width: 66px;
+      height: 198px;
+      background: var(--rocker-bg);
+      border: 1.5px solid var(--rocker-border);
+      border-radius: 24px;
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3), 0 3px 8px rgba(0, 0, 0, 0.2);
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+    .rocker-btn {
+      width: 100%;
+      flex: 1;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--btn-text);
+      transition: all 0.04s ease;
+    }
+    .rocker-btn .sub-label {
+      font-size: 8.5px;
+      font-family: ui-monospace, monospace;
+      font-weight: 800;
+      color: var(--btn-text-sub);
+      margin-top: -2px;
+    }
+    .rocker-sep-btn {
+      width: 100%;
+      height: 36px;
+      margin: 4px 0;
+      border-radius: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    /* PILLS DE STREAMING DE ALTA FIDELIDAD (PERFECTAMENTE ENCUADRADOS 2x3) */
+    .plat-tab {
+      background: var(--plat-inactive-bg);
+      border: 1.5px solid var(--plat-inactive-border);
+      color: var(--plat-inactive-text);
+      font-weight: 800;
+      transition: transform 0.05s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      touch-action: manipulation;
+    }
+    .plat-tab:active {
+      transform: scale(0.95);
+      border-color: #3b82f6 !important;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.5) !important;
+    }
+    .plat-tab.plat-pulse {
+      border-color: #2563eb !important;
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.7) !important;
+    }
+
+    /* INPUT DE BÚSQUEDA */
+    .retro-input {
+      background: var(--input-bg);
+      border: 1.5px solid var(--input-border);
+      color: var(--input-text);
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+    .retro-input::placeholder {
+      color: var(--input-placeholder);
+    }
+
+    /* BOTÓN TEMA / FOOTER */
+    .theme-toggle-btn {
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
+      color: var(--btn-text);
+      font-family: ui-monospace, monospace;
+      font-weight: 800;
+      box-shadow: var(--btn-shadow);
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body>
+
+<div class="retro-chassis">
+
+  <!-- 1. PANTALLA LCD RETRO DE ESTADO SUPERIOR (ALTA LEGIBILIDAD) -->
+  <div class="retro-lcd px-2.5 py-1 flex items-center justify-between text-[10.5px] tracking-wider flex-shrink-0 font-mono font-bold">
+    <div class="flex items-center gap-1.5 truncate">
+      <span id="lcdPwrDot" class="inline-block w-2.5 h-2.5 rounded-full bg-slate-400 transition-all flex-shrink-0"></span>
+      <span id="lcdTarget" class="truncate">SALÓN · STANDBY</span>
+      <span class="opacity-40">|</span>
+      <span id="lcdVol" class="flex-shrink-0">🔊 0</span>
+      <span class="opacity-40">|</span>
+      <span id="lcdAudio" class="flex-shrink-0">ARC: SHARP</span>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0 ml-1">
+      <span id="lcdTimer" onclick="confirmarCancelarTimer()" class="cursor-pointer tracking-tight">⏱ SLEEP: OFF</span>
+    </div>
+  </div>
+
+  <!-- 2. CABECERA: BOTÓN POWER ÚNICO (ROJO=OFF/STANDBY / VERDE=ENCENDIDA) | SELECTOR TELE SALÓN / TELE CUARTO / AMBAS -->
+  <div class="flex items-center justify-between gap-1.5 flex-shrink-0 w-full">
+    <button id="btnPowerToggle" onclick="togglePower()" title="Tele Salón en Standby (Toca para encender)" class="btn-power-off px-3 h-8 rounded-xl flex items-center justify-center gap-1 font-black text-xs active:scale-95 transition-all shadow flex-shrink-0 min-w-[66px]">
+      <span>🔴</span> <span>OFF</span>
+    </button>
+
+    <div class="flex-1 grid retro-selector-bar p-0.5 gap-1 h-8 items-center overflow-hidden" style="grid-template-columns: 1.15fr 1.15fr 0.7fr;">
+      <button onclick="setDispositivo('lg')" id="tab-lg" title="Tele del Salón (LG 65&quot;)" class="retro-tab active flex items-center justify-center gap-1 h-full px-1 text-[10px] font-black rounded-lg transition-all" style="white-space: nowrap;">
+        <span id="dot-lg" class="inline-block w-2 h-2 rounded-full bg-slate-400 flex-shrink-0"></span>
+        <span>Tele Salón</span>
+        <span id="badge-lg" class="text-[7.5px] px-1 py-0.5 rounded font-mono font-black bg-slate-300 text-slate-800 flex-shrink-0 leading-none">OFF</span>
+      </button>
+      <button onclick="setDispositivo('xiaomi')" id="tab-xiaomi" title="Tele del Cuarto (Xiaomi)" class="retro-tab flex items-center justify-center gap-1 h-full px-1 text-[10px] font-black rounded-lg transition-all" style="white-space: nowrap;">
+        <span id="dot-xiaomi" class="inline-block w-2 h-2 rounded-full bg-slate-400 flex-shrink-0"></span>
+        <span>Tele Cuarto</span>
+        <span id="badge-xiaomi" class="text-[7.5px] px-1 py-0.5 rounded font-mono font-black bg-slate-300 text-slate-800 flex-shrink-0 leading-none">OFF</span>
+      </button>
+      <button onclick="setDispositivo('ambas')" id="tab-ambas" title="Ambas teles" class="retro-tab flex items-center justify-center gap-1 h-full px-1 text-[10px] font-black rounded-lg transition-all" style="white-space: nowrap;">
+        <span>Ambas</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 3. APPS & BÚSQUEDA RÁPIDA (ZONA SUPERIOR) -->
+  <div class="w-full flex-shrink-0 space-y-1">
+    <div class="grid grid-cols-3 gap-1.5 w-full">
+      <button type="button" onclick="lanzarPlataforma('smarttube')" id="plat-smarttube" class="plat-tab py-1.5 px-1 rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+        <span class="text-xs">📺</span> <span id="lblTube">SmartTube</span>
+      </button>
+      <button type="button" onclick="lanzarPlataforma('netflix')" id="plat-netflix" class="plat-tab py-1.5 px-1 rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+        <span class="text-xs">🍿</span> <span>Netflix</span>
+      </button>
+      <button type="button" onclick="lanzarPlataforma('prime')" id="plat-prime" class="plat-tab py-1.5 px-1 rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+        <span class="text-xs">📦</span> <span>Prime</span>
+      </button>
+      <button type="button" onclick="lanzarPlataforma('disney')" id="plat-disney" class="plat-tab py-1.5 px-1 rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+        <span class="text-xs">✨</span> <span>Disney+</span>
+      </button>
+      <button type="button" onclick="lanzarPlataforma('movistar')" id="plat-movistar" class="plat-tab py-1.5 px-1 rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+        <span class="text-xs">🔵</span> <span>Movistar+</span>
+      </button>
+      <button type="button" onclick="lanzarPlataforma('dazn')" id="plat-dazn" class="plat-tab py-1.5 px-1 rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all">
+        <span class="text-xs">⚽</span> <span>DAZN</span>
+      </button>
+    </div>
+
+    <form onsubmit="buscarYReproducir(event)" class="relative flex items-center">
+      <input 
+        id="inputBusqueda" 
+        type="search" 
+        enterkeyhint="search" 
+        autocomplete="off" 
+        spellcheck="false" 
+        placeholder="🔍 Buscar o abrir en YouTube..." 
+        class="w-full retro-input rounded-xl pl-3 pr-12 py-1.5 text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <button type="submit" class="absolute right-1 px-3 py-1 bg-blue-600 active:bg-blue-700 text-white rounded-lg text-xs font-bold shadow">
+        Ir
+      </button>
+    </form>
+  </div>
+
+  <!-- 4. MODOS DE IMAGEN COMPACTOS -->
+  <div class="grid grid-cols-5 gap-1.5 flex-shrink-0">
+    <button onclick="enviarNoche()" id="btnNoche" title="Modo Noche — toca para ciclar duración" class="btn-retro py-1 px-1 rounded-xl text-center border-l-4 border-indigo-500">
+      <div class="text-[11px] leading-none">🌙</div>
+      <div class="text-[10px] font-black leading-tight mt-0.5">Noche</div>
+      <div id="lblNocheMins" class="text-[8px] font-mono font-bold text-indigo-600 dark:text-indigo-300">6% • 90m</div>
+    </button>
+
+    <button onclick="enviarAccion('dia')" title="Modo Día (100% Brillo)" class="btn-retro py-1 px-1 rounded-xl text-center border-l-4 border-amber-500">
+      <div class="text-[11px] leading-none">☀️</div>
+      <div class="text-[10px] font-black leading-tight mt-0.5">Día</div>
+      <div class="text-[8px] font-mono font-bold text-amber-600 dark:text-amber-300">100%</div>
+    </button>
+
+    <button onclick="enviarAccion('cine')" title="Modo Cine" class="btn-retro py-1 px-1 rounded-xl text-center border-l-4 border-slate-500">
+      <div class="text-[11px] leading-none">🎬</div>
+      <div class="text-[10px] font-black leading-tight mt-0.5">Cine</div>
+      <div class="text-[8px] font-mono font-bold text-slate-600 dark:text-slate-400">D65</div>
+    </button>
+
+    <button onclick="enviarAccion('juego')" title="Modo Juego" class="btn-retro py-1 px-1 rounded-xl text-center border-l-4 border-emerald-500">
+      <div class="text-[11px] leading-none">🎮</div>
+      <div class="text-[10px] font-black leading-tight mt-0.5">Juego</div>
+      <div class="text-[8px] font-mono font-bold text-emerald-600 dark:text-emerald-400">9ms</div>
+    </button>
+
+    <button onclick="enviarAccion('descanso')" title="Modo Descanso Visual (25% brillo)" class="btn-retro py-1 px-1 rounded-xl text-center border-l-4 border-teal-500">
+      <div class="text-[11px] leading-none">👁️</div>
+      <div class="text-[10px] font-black leading-tight mt-0.5">Desc.</div>
+      <div class="text-[8px] font-mono font-bold text-teal-600 dark:text-teal-400">25%</div>
+    </button>
+  </div>
+
+  <!-- 5. SLIDERS ANALÓGICOS (VOLUMEN PRINCIPAL ARRIBA, BRILLO DEBAJO) -->
+  <div class="retro-sliders-box px-2.5 py-1.5 space-y-1 flex-shrink-0">
+    <div>
+      <div class="flex justify-between items-center text-[9.5px] font-mono font-black tracking-wider mb-0.5">
+        <span class="opacity-90">🔊 VOLUMEN</span>
+        <span id="volVal" class="text-purple-600 dark:text-purple-400 font-extrabold text-[11px]">0%</span>
+      </div>
+      <input id="sliderVol" type="range" min="0" max="100" value="0" 
+        onpointerdown="_sliderVolActivo = true" 
+        onpointerup="_sliderVolActivo = false"
+        onpointercancel="_sliderVolActivo = false"
+        ontouchstart="_sliderVolActivo = true" 
+        ontouchend="_sliderVolActivo = false"
+        ontouchcancel="_sliderVolActivo = false"
+        oninput="actualizarLabelVol(this.value)" 
+        onchange="enviarVolumen(this.value)" class="w-full slider-vol">
+    </div>
+    <div>
+      <div class="flex justify-between items-center text-[9px] font-mono font-black tracking-wider mb-0.5">
+        <span class="opacity-80">☀️ BRILLO</span>
+        <span id="brilloVal" class="text-sky-600 dark:text-sky-400 font-extrabold text-[10px]">0%</span>
+      </div>
+      <input id="sliderBrillo" type="range" min="0" max="100" value="0" 
+        onpointerdown="_sliderBrilloActivo = true" 
+        onpointerup="_sliderBrilloActivo = false"
+        onpointercancel="_sliderBrilloActivo = false"
+        ontouchstart="_sliderBrilloActivo = true" 
+        ontouchend="_sliderBrilloActivo = false"
+        ontouchcancel="_sliderBrilloActivo = false"
+        oninput="actualizarLabelBrillo(this.value)" 
+        onchange="enviarBrillo(this.value)" class="w-full">
+    </div>
+  </div>
+
+  <!-- 6. ZONA DEL PULGAR: ROCKER VOL + CRUCETA D-PAD + ROCKER CH/HDMI -->
+  <div class="flex items-center justify-between gap-1.5 flex-shrink-0 my-0.5">
+    
+    <!-- Rocker Volumen Clásico -->
+    <div class="retro-rocker-mod">
+      <button data-repeat="vol_up" onclick="enviarAccion('vol_up')" title="Volumen +" class="btn-retro rocker-btn">
+        <span>+</span>
+        <span class="sub-label">VOL</span>
+      </button>
+      <button onclick="enviarAccion('mute')" title="Silenciar / Mute" class="btn-retro rocker-sep-btn text-amber-600 dark:text-amber-400">
+        🔇
+      </button>
+      <button data-repeat="vol_down" onclick="enviarAccion('vol_down')" title="Volumen -" class="btn-retro rocker-btn">
+        <span class="sub-label">VOL</span>
+        <span>-</span>
+      </button>
+    </div>
+
+    <!-- Cruceta D-Pad Circular Retro (198px) -->
+    <div class="retro-dpad-bezel mx-auto">
+      <button data-repeat="up" onclick="enviarAccion('up')" title="Arriba" class="dpad-key dpad-k-up">▲</button>
+      <button data-repeat="down" onclick="enviarAccion('down')" title="Abajo" class="dpad-key dpad-k-down">▼</button>
+      <button data-repeat="left" onclick="enviarAccion('left')" title="Izquierda" class="dpad-key dpad-k-left">◄</button>
+      <button data-repeat="right" onclick="enviarAccion('right')" title="Derecha" class="dpad-key dpad-k-right">►</button>
+      <button onclick="enviarAccion('enter')" title="Aceptar / OK" class="dpad-k-center">OK</button>
+    </div>
+
+    <!-- Rocker Canales y HDMI -->
+    <div class="retro-rocker-mod">
+      <button data-repeat="ch_up" onclick="enviarAccion('ch_up')" title="Canal +" class="btn-retro rocker-btn">
+        <span>+</span>
+        <span class="sub-label">CH</span>
+      </button>
+      <button onclick="enviarAccion('source')" title="Entrada / HDMI" class="btn-retro rocker-sep-btn text-sky-600 dark:text-sky-400 font-mono text-[9.5px]">
+        HDMI
+      </button>
+      <button data-repeat="ch_down" onclick="enviarAccion('ch_down')" title="Canal -" class="btn-retro rocker-btn">
+        <span class="sub-label">CH</span>
+        <span>-</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 7. TRANSPORTE PRINCIPAL (EN ZONA CÓMODA DEL PULGAR) -->
+  <div class="grid grid-cols-5 gap-1.5 flex-shrink-0">
+    <button onclick="enviarAccion('back')" title="Atrás" class="btn-retro h-11 rounded-xl flex items-center justify-center font-black text-lg">
+      <span>↩</span>
+    </button>
+    <button data-repeat="rewind" onclick="enviarAccion('rewind')" title="Rebobinar -10s" class="btn-retro h-11 rounded-xl flex items-center justify-center font-black text-lg">
+      <span>⏪</span>
+    </button>
+    <button onclick="enviarAccion('play_pause')" title="Play / Pausa" class="btn-retro h-11 rounded-xl text-white bg-gradient-to-b from-indigo-600 to-indigo-800 border-indigo-400/50 flex items-center justify-center text-xl shadow-md">
+      ⏯️
+    </button>
+    <button data-repeat="fast_forward" onclick="enviarAccion('fast_forward')" title="Avanzar +10s" class="btn-retro h-11 rounded-xl flex items-center justify-center font-black text-lg">
+      <span>⏩</span>
+    </button>
+    <button onclick="enviarAccion('home')" title="Inicio (Home)" class="btn-retro h-11 rounded-xl flex items-center justify-center font-black text-lg">
+      <span>🏠</span>
+    </button>
+  </div>
+
+  <!-- 8. UTILIDADES REALES DE SALÓN (AUDIO BARRA + MÚSICA + AJUSTES + QR INVITADOS + SIRI) -->
+  <div class="grid grid-cols-5 gap-1.5 flex-shrink-0">
+    <button id="btnAudioSharp" onclick="conmutarSalidaAudio()" title="Conmutar Barra Sharp ARC / Altavoces TV" class="btn-retro h-10 rounded-xl flex flex-col items-center justify-center text-emerald-600 dark:text-emerald-400 font-black text-[8.5px] border-emerald-500/50">
+      <span class="text-sm">📢</span>
+      <span id="lblAudioOut" class="font-mono tracking-tight">SHARP ARC</span>
+    </button>
+    <button id="btnSoloAudio" onclick="enviarAccion('solo_audio')" title="Solo Audio (apaga pantalla dejando sonido)" class="btn-retro h-10 rounded-xl flex flex-col items-center justify-center text-amber-600 dark:text-amber-300 font-bold text-[8.5px] border-amber-500/40">
+      <span class="text-sm">📻</span>
+      <span class="font-mono">SIN PANT.</span>
+    </button>
+    <button onclick="enviarAccion('settings')" title="Ajustes de la TV" class="btn-retro h-10 rounded-xl flex flex-col items-center justify-center font-bold text-[8.5px]">
+      <span class="text-sm">⚙️</span>
+      <span class="font-mono">AJUSTES</span>
+    </button>
+    <button onclick="abrirModalInvitados()" title="Pasar mando por QR a invitados" class="btn-retro h-10 rounded-xl flex flex-col items-center justify-center text-emerald-700 dark:text-emerald-300 font-black text-[8.5px] border-emerald-500/40">
+      <span class="text-sm">📲</span>
+      <span class="font-mono">QR</span>
+    </button>
+    <a href="/siri" title="Atajos de Voz Siri" class="btn-retro h-10 rounded-xl flex flex-col items-center justify-center text-sky-700 dark:text-sky-300 font-black text-[8.5px] border-sky-500/40">
+      <span class="text-sm">🎙️</span>
+      <span class="font-mono">SIRI</span>
+    </a>
+  </div>
+
+  <!-- 9. PIE DE PÁGINA DISCRETO: ESTADO + INFO + TEMA -->
+  <div class="flex items-center justify-between text-[10px] px-1 border-t border-[var(--divider)] pt-1 flex-shrink-0 font-mono">
+    <div class="flex items-center gap-1.5 truncate">
+      <span id="statusTxt" class="font-bold truncate max-w-[170px] opacity-90">READY</span>
+    </div>
+    <div class="flex items-center gap-1">
+      <button onclick="enviarAccion('info')" title="Información en pantalla" class="theme-toggle-btn px-1.5 py-0.5 rounded-lg text-[9px] flex items-center gap-1 active:scale-95 transition-all shadow-sm">
+        ℹ️ <span>INFO</span>
+      </button>
+      <button id="btnTema" onclick="ciclarTema()" title="Cambiar tema de apariencia" class="theme-toggle-btn px-1.5 py-0.5 rounded-lg text-[9px] flex items-center gap-1 active:scale-95 transition-all shadow-sm">
+        🌓 <span>AUTO</span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL PARA PASAR EL MANDO A INVITADOS -->
+<div id="modalInvitados" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden flex items-center justify-center p-4" onclick="if(event.target===this)cerrarModalInvitados()">
+  <div class="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl max-w-xs w-full p-4 space-y-3 text-center shadow-2xl">
+    <div class="flex justify-between items-center pb-2 border-b border-[var(--divider)]">
+      <h3 class="text-xs font-black tracking-wider flex items-center gap-1.5" style="color: var(--btn-text)">
+        <span>📲</span> <span>PASAR MANDO A INVITADOS</span>
+      </h3>
+      <button onclick="cerrarModalInvitados()" class="text-slate-400 hover:text-slate-600 font-bold text-sm px-2">✕</button>
+    </div>
+
+    <!-- Código QR -->
+    <div class="p-2 bg-white rounded-xl inline-block shadow-inner mx-auto border border-slate-200">
+      <img id="qrInvitadosImg" src="" alt="QR Mando TV" class="w-40 h-40 mx-auto rounded-lg" onerror="this.classList.add('hidden'); document.getElementById('qrFallbackUrl').classList.remove('hidden');">
+      <div id="qrFallbackUrl" class="hidden w-40 py-6 px-2 text-slate-900 font-mono font-bold text-xs break-all">
+        http://mac-pro-2014.local:8899
+      </div>
+    </div>
+
+    <p class="text-[11px] font-semibold opacity-90 leading-snug" style="color: var(--btn-text-sub)">
+      1. Conéctalos a tu <strong>Wi-Fi</strong>.<br>
+      2. Que apunten con la <strong>cámara del móvil</strong>.
+    </p>
+
+    <!-- Botones de Acción Rápida -->
+    <div class="space-y-1.5 pt-1">
+      <button onclick="compartirNativo()" class="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-xl shadow flex items-center justify-center gap-2 transition-all">
+        <span>📤</span> <span>AirDrop / WhatsApp</span>
+      </button>
+
+      <button onclick="copiarEnlaceMando()" class="w-full py-1.5 px-3 bg-[var(--btn-bg)] border border-[var(--btn-border)] active:scale-95 font-bold text-[10.5px] rounded-xl flex items-center justify-center gap-1.5 transition-all" style="color: var(--btn-text)">
+        <span>📋</span> <span id="lblCopiarEnlace">Copiar Enlace</span>
+      </button>
+    </div>
+
+    <div class="text-[9px] font-mono opacity-70 leading-tight pt-1" style="color: var(--btn-text-sub)">
+      💡 En iPhone pueden pulsar "Compartir" → "Añadir a pantalla de inicio" para guardarlo como app propia.
+    </div>
+  </div>
+</div>
+
+<script>
+  let dispositivoActual = localStorage.getItem('mando_target') || 'lg';
+  let plataformaActual = 'smarttube';
+  let audioEsSharp = true;
+  let timerActualMinutos = 0;
+  let _sliderBrilloActivo = false;
+  let _sliderVolActivo = false;
+  let _ultimoCambioSliderTs = 0;
+  let _serverLanIp = '';
+  let _estadoActualTv = 'standby';
+  let _estadoLgCache = 'standby';
+  let _estadoXiaomiCache = 'standby';
+  let _fallosSyncConsecutivos = 0;
+
+  const placeholders = {
+    'smarttube': '🔍 Buscar o abrir en SmartTube...',
+    'youtube': '▶️ Buscar o abrir en YouTube...',
+    'netflix': '🍿 Buscar serie o peli en Netflix...',
+    'prime': '📦 Buscar en Prime Video...',
+    'disney': '✨ Buscar en Disney+...',
+    'movistar': '🔵 Buscar o abrir en Movistar+...',
+    'dazn': '⚽ Buscar o abrir en DAZN...'
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      setDispositivo(dispositivoActual);
+      actualizarBotonTema();
+      iniciarAutoRepeticion();
+    }, 0);
+  });
+
+  function iniciarAutoRepeticion() {
+    document.querySelectorAll('[data-repeat]').forEach(btn => {
+      const cmd = btn.getAttribute('data-repeat');
+      let holdTimer = null;
+      let repInterval = null;
+      const detener = () => {
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+        if (repInterval) { clearInterval(repInterval); repInterval = null; }
+      };
+      btn.addEventListener('pointerdown', (e) => {
+        if (e.button && e.button !== 0) return;
+        btn.dataset.holdFired = '0';
+        detener();
+        holdTimer = setTimeout(() => {
+          btn.dataset.holdFired = '1';
+          enviarAccion(cmd);
+          repInterval = setInterval(() => enviarAccion(cmd), 135);
+        }, 380);
+      });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => {
+        btn.addEventListener(ev, detener);
+      });
+      btn.addEventListener('click', (e) => {
+        if (btn.dataset.holdFired === '1') {
+          btn.dataset.holdFired = '0';
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+    });
+  }
+
+  /* =======================================================================
+     SISTEMA DE TEMAS: AUTOMÁTICO (SISTEMA) | CLARO | OSCURO
+     ======================================================================= */
+  function obtenerTemaSistema() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function aplicarTema(modo) {
+    localStorage.setItem('mando_theme', modo);
+    const efectivo = (modo === 'auto') ? obtenerTemaSistema() : modo;
+
+    document.documentElement.classList.remove('theme-light', 'theme-dark', 'dark');
+    document.documentElement.classList.add('theme-' + efectivo);
+    if (efectivo === 'dark') document.documentElement.classList.add('dark');
+    document.documentElement.setAttribute('data-theme-mode', modo);
+
+    const meta = document.getElementById('metaThemeColor');
+    if (meta) meta.setAttribute('content', efectivo === 'light' ? '#f1f5f9' : '#07090e');
+
+    actualizarBotonTema();
+  }
+
+  function actualizarBotonTema() {
+    const modo = localStorage.getItem('mando_theme') || 'auto';
+    const efectivo = (modo === 'auto') ? obtenerTemaSistema() : modo;
+    const btn = document.getElementById('btnTema');
+    if (!btn) return;
+
+    if (modo === 'auto') {
+      btn.innerHTML = '🌓 <span>AUTO</span>';
+      btn.title = 'Modo Automático del Sistema (' + (efectivo === 'light' ? 'Claro' : 'Oscuro') + ') — Toca para cambiar';
+    } else if (modo === 'light') {
+      btn.innerHTML = '☀️ <span>CLARO</span>';
+      btn.title = 'Modo Claro forzado — Toca para cambiar a Oscuro';
+    } else {
+      btn.innerHTML = '🌙 <span>OSCURO</span>';
+      btn.title = 'Modo Oscuro forzado — Toca para cambiar a Automático';
+    }
+  }
+
+  function ciclarTema() {
+    vibrar();
+    const actual = localStorage.getItem('mando_theme') || 'auto';
+    let siguiente = 'auto';
+    if (actual === 'auto') siguiente = 'light';
+    else if (actual === 'light') siguiente = 'dark';
+    else siguiente = 'auto';
+
+    aplicarTema(siguiente);
+    const nombre = siguiente === 'auto' ? 'AUTOMÁTICO' : (siguiente === 'light' ? 'MODO CLARO' : 'MODO OSCURO');
+    actualizarStatus('TEMA: ' + nombre);
+  }
+
+  // Listener para sincronización en tiempo real si el usuario cambia el tema en iOS
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      const modo = localStorage.getItem('mando_theme') || 'auto';
+      if (modo === 'auto') {
+        aplicarTema('auto');
+      }
+    });
+  }
+
+  /* =======================================================================
+     FEEDBACK HÁPTICO / AUDIO
+     ======================================================================= */
+  let _audioCtx = null;
+  function vibrar() {
+    if (navigator.vibrate) navigator.vibrate(25);
+    try {
+      if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = _audioCtx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(75, ctx.currentTime);
+      gain.gain.setValueAtTime(0.09, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.04);
+    } catch(e) {}
+  }
+
+  /* =======================================================================
+     SELECCIÓN DE DISPOSITIVO Y PLATAFORMA
+     ======================================================================= */
+  function setDispositivo(target) {
+    vibrar();
+    dispositivoActual = target;
+    localStorage.setItem('mando_target', target);
+    ['xiaomi', 'lg', 'ambas'].forEach(t => {
+      const el = document.getElementById('tab-' + t);
+      if (!el) return;
+      if (t === target) {
+        el.className = 'retro-tab active flex items-center justify-center gap-1 h-full px-1 text-[10px] font-black rounded-lg transition-all';
+      } else {
+        el.className = 'retro-tab flex items-center justify-center gap-1 h-full px-1 text-[10px] font-black rounded-lg transition-all';
+      }
+    });
+
+    const nombreLcd = target === 'ambas' ? 'AMBAS' : (target === 'lg' ? 'TELE SALÓN' : 'TELE CUARTO');
+    const lcdEl = document.getElementById('lcdTarget');
+    if (lcdEl) lcdEl.textContent = nombreLcd;
+
+    const btnTube = document.getElementById('plat-smarttube');
+    if (btnTube) {
+      btnTube.innerHTML = (target === 'lg') ? '▶️ <span>YouTube</span>' : '📺 <span id="lblTube">SmartTube</span>';
+    }
+
+    const soloLg = (target !== 'xiaomi');
+    ['btnAudioSharp', 'btnSoloAudio'].forEach(id => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.classList.toggle('opacity-35', !soloLg);
+      b.classList.toggle('pointer-events-none', !soloLg);
+      b.disabled = !soloLg;
+    });
+
+    // Actualizar inmediatamente el botón Power según el estado en memoria de la tele seleccionada
+    const stActual = (target === 'lg') ? _estadoLgCache : (target === 'xiaomi' ? _estadoXiaomiCache : ((_estadoLgCache === 'on' || _estadoXiaomiCache === 'on') ? 'on' : (_estadoLgCache === 'booting' || _estadoXiaomiCache === 'booting' ? 'booting' : 'standby')));
+    actualizarBotonPower(stActual);
+
+    actualizarVisualPlataformas();
+    actualizarStatus('CONTROL: ' + nombreLcd);
+    sincronizarEstadoServidor();
+  }
+
+  /* LANZAMIENTO DIRECTO EN LA TELE AL TOCAR EL BOTÓN */
+  async function lanzarPlataforma(plat) {
+    vibrar();
+    plataformaActual = plat;
+
+    // Feedback táctil visual (pulso momentáneo)
+    const btn = document.getElementById('plat-' + plat);
+    if (btn) {
+      btn.classList.add('plat-pulse');
+      setTimeout(() => btn.classList.remove('plat-pulse'), 500);
+    }
+
+    actualizarVisualPlataformas();
+
+    const platEfectiva = (plat === 'smarttube' && dispositivoActual === 'lg') ? 'youtube' : plat;
+    const nombres = {
+      'smarttube': 'SmartTube',
+      'youtube': 'YouTube',
+      'netflix': 'Netflix',
+      'prime': 'Prime Video',
+      'disney': 'Disney+',
+      'movistar': 'Movistar Plus+',
+      'dazn': 'DAZN'
+    };
+    const nombreDisp = nombres[platEfectiva] || platEfectiva.toUpperCase();
+    actualizarStatus('ABRIENDO ' + nombreDisp.toUpperCase() + ' EN ' + dispositivoActual.toUpperCase() + '...');
+
+    try {
+      const url = '/api/voice?q=&platform=' + encodeURIComponent(platEfectiva) + '&target=' + encodeURIComponent(dispositivoActual);
+      const res = await fetch(url);
+      const data = await res.json();
+      actualizarStatus(data.mensaje || ('ABRIENDO ' + nombreDisp));
+    } catch(e) {
+      actualizarStatus('ERR CONEXIÓN');
+    }
+  }
+
+  function setPlataforma(plat) {
+    lanzarPlataforma(plat);
+  }
+
+  function actualizarVisualPlataformas() {
+    const plats = ['smarttube', 'netflix', 'prime', 'disney', 'movistar', 'dazn'];
+    plats.forEach(p => {
+      const btn = document.getElementById('plat-' + p);
+      if (btn) {
+        btn.className = 'plat-tab py-1.5 px-1 rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all';
+      }
+    });
+    const inp = document.getElementById('inputBusqueda');
+    if (inp) {
+      const targetPlat = (plataformaActual === 'smarttube' && dispositivoActual === 'lg') ? 'youtube' : plataformaActual;
+      inp.placeholder = placeholders[targetPlat] || placeholders[plataformaActual] || '🔍 Buscar...';
+      inp.value = '';
+    }
+  }
+
+  async function buscarYReproducir(e) {
+    if (e) e.preventDefault();
+    vibrar();
+    const query = document.getElementById('inputBusqueda').value.trim();
+    const platEfectiva = (plataformaActual === 'smarttube' && dispositivoActual === 'lg') ? 'youtube' : plataformaActual;
+    const nombreDisplay = (platEfectiva === 'smarttube' ? 'SMARTTUBE' : (platEfectiva === 'movistar' ? 'MOVISTAR+' : platEfectiva.toUpperCase()));
+    actualizarStatus('LANZANDO ' + nombreDisplay + (query ? ': ' + query : '...'));
+
+    try {
+      const url = '/api/voice?q=' + encodeURIComponent(query) + '&platform=' + encodeURIComponent(platEfectiva) + '&target=' + encodeURIComponent(dispositivoActual);
+      const res = await fetch(url);
+      const data = await res.json();
+      actualizarStatus(data.mensaje || 'STREAM ENVIADO');
+    } catch(err) {
+      actualizarStatus('ERR CONEXIÓN');
+    }
+  }
+
+  let _syncTimeout = null;
+  let _syncEnCurso = false;
+
+  async function enviarAccion(cmd, val = '0') {
+    vibrar();
+    if (cmd === 'vol_up' || cmd === 'vol_down') {
+      const sVol = document.getElementById('sliderVol');
+      const vLbl = document.getElementById('volVal');
+      const lcdVol = document.getElementById('lcdVol');
+      if (sVol) {
+        const paso = (dispositivoActual === 'xiaomi') ? 7 : 1;
+        const delta = (cmd === 'vol_up') ? paso : -paso;
+        const nuevo = Math.max(0, Math.min(100, (parseInt(sVol.value, 10) || 0) + delta));
+        sVol.value = nuevo;
+        if (vLbl) vLbl.textContent = nuevo + '%';
+        if (lcdVol) lcdVol.textContent = '🔊 ' + nuevo;
+        _ultimoCambioSliderTs = Date.now();
+      }
+    }
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const abortTimer = ctrl ? setTimeout(() => ctrl.abort(), 2500) : null;
+    try {
+      const url = '/api/action?cmd=' + encodeURIComponent(cmd) + '&target=' + encodeURIComponent(dispositivoActual) + '&val=' + encodeURIComponent(val);
+      const res = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
+      const data = await res.json();
+      if (data.ok === false) {
+        actualizarStatus('⚠ ' + (data.mensaje || 'ERROR'));
+        if (navigator.vibrate) navigator.vibrate([70, 40, 70]);
+        const btnOn = document.getElementById('btnPowerToggle');
+        if (btnOn) {
+          btnOn.classList.add('ring-4', 'ring-amber-400', 'animate-pulse');
+          setTimeout(() => btnOn.classList.remove('ring-4', 'ring-amber-400', 'animate-pulse'), 2500);
+        }
+      } else if (data.mensaje) {
+        actualizarStatus(data.mensaje);
+      }
+      clearTimeout(_syncTimeout);
+      const delaySync = (cmd === 'vol_up' || cmd === 'vol_down' || cmd === 'mute' || cmd === 'set_volumen') ? 250 : 600;
+      _syncTimeout = setTimeout(sincronizarEstadoServidor, delaySync);
+    } catch(e) {
+      actualizarStatus('ERR TRANSMISIÓN');
+    } finally {
+      if (abortTimer) clearTimeout(abortTimer);
+    }
+  }
+
+  function actualizarBotonAudioUI() {
+    const lbl = audioEsSharp ? 'SHARP ARC' : 'ALTAVOZ TV';
+    const lcdTxt = audioEsSharp ? 'ARC: SHARP' : 'SPK: TV';
+    const lblEl = document.getElementById('lblAudioOut');
+    const lcdEl = document.getElementById('lcdAudio');
+    const btnEl = document.getElementById('btnAudioSharp');
+    if (lblEl) lblEl.textContent = lbl;
+    if (lcdEl) lcdEl.textContent = lcdTxt;
+    if (btnEl) {
+      if (audioEsSharp) {
+        btnEl.style.borderColor = '#10b981';
+        btnEl.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.35)';
+      } else {
+        btnEl.style.borderColor = '';
+        btnEl.style.boxShadow = '';
+      }
+    }
+  }
+
+  function conmutarSalidaAudio() {
+    vibrar();
+    audioEsSharp = !audioEsSharp;
+    const cmd = audioEsSharp ? 'audio_sharp' : 'audio_tv';
+    actualizarBotonAudioUI();
+    enviarAccion(cmd);
+    actualizarStatus(audioEsSharp ? 'AUDIO: BARRA SHARP' : 'AUDIO: ALTAVOCES TV');
+  }
+
+  function actualizarLabelBrillo(v) {
+    document.getElementById('brilloVal').textContent = v + '%';
+  }
+  function enviarBrillo(v) {
+    _sliderBrilloActivo = false;
+    _ultimoCambioSliderTs = Date.now();
+    enviarAccion('set_brillo', v);
+  }
+
+  function actualizarLabelVol(v) {
+    document.getElementById('volVal').textContent = v + '%';
+    const lcdVol = document.getElementById('lcdVol');
+    if (lcdVol) lcdVol.textContent = '🔊 ' + v;
+  }
+  function enviarVolumen(v) {
+    _sliderVolActivo = false;
+    _ultimoCambioSliderTs = Date.now();
+    enviarAccion('set_volumen', v);
+  }
+
+  function _nombreAmigable(target) {
+    return target === 'lg' ? 'TELE SALÓN' : (target === 'xiaomi' ? 'TELE CUARTO' : 'AMBAS');
+  }
+
+  function actualizarBotonPower(st) {
+    _estadoActualTv = st;
+    const btn = document.getElementById('btnPowerToggle');
+    if (!btn) return;
+    const nom = _nombreAmigable(dispositivoActual);
+    if (st === 'on') {
+      // ESTADO ENCENDIDA: Botón VERDE vibrante (indicador activo) -> Al pulsar apaga
+      btn.className = 'btn-power-on px-3 h-8 rounded-xl flex items-center justify-center gap-1 font-black text-xs active:scale-95 transition-all shadow flex-shrink-0 min-w-[66px]';
+      btn.innerHTML = '<span>🟢</span> <span>ON</span>';
+      btn.title = nom + ' ENCENDIDA (Toca para apagar)';
+    } else if (st === 'booting') {
+      // ARRANCANDO / DESPERTANDO: Botón ÁMBAR parpadeante
+      btn.className = 'bg-amber-500 text-slate-950 animate-pulse px-3 h-8 rounded-xl flex items-center justify-center gap-1 font-black text-xs active:scale-95 transition-all shadow flex-shrink-0 min-w-[66px]';
+      btn.innerHTML = '<span>⏳</span> <span>INIC</span>';
+      btn.title = 'Iniciando ' + nom + '...';
+    } else {
+      // ESTADO APAGADA / STANDBY: Botón ROJO -> Al pulsar enciende
+      btn.className = 'btn-power-off px-3 h-8 rounded-xl flex items-center justify-center gap-1 font-black text-xs active:scale-95 transition-all shadow flex-shrink-0 min-w-[66px]';
+      btn.innerHTML = '<span>🔴</span> <span>OFF</span>';
+      btn.title = nom + ' EN STANDBY (Toca para encender)';
+    }
+  }
+
+  function togglePower() {
+    if (_estadoActualTv === 'on') {
+      solicitarApagado();
+    } else {
+      solicitarEncendido();
+    }
+  }
+
+  function solicitarEncendido() {
+    vibrar();
+    actualizarBotonPower('booting');
+    enviarAccion('encender');
+    actualizarStatus('ENCENDIENDO ' + _nombreAmigable(dispositivoActual));
+  }
+
+  function solicitarApagado() {
+    vibrar();
+    actualizarBotonPower('standby');
+    enviarAccion('apagar');
+    actualizarStatus('APAGANDO ' + _nombreAmigable(dispositivoActual));
+  }
+
+  function confirmarCancelarTimer() {
+    if (timerActualMinutos <= 0) return;
+    vibrar();
+    if (confirm('¿Cancelar temporizador de apagado de ' + timerActualMinutos + ' min?')) {
+      enviarAccion('cancelar_timer');
+      actualizarStatus('TEMPORIZADOR CANCELADO');
+      document.getElementById('lcdTimer').textContent = '⏱ SLEEP: OFF';
+      timerActualMinutos = 0;
+    }
+  }
+
+  async function sincronizarEstadoServidor() {
+    if (_syncEnCurso) return;
+    _syncEnCurso = true;
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const abortTimer = ctrl ? setTimeout(() => ctrl.abort(), 2500) : null;
+    try {
+      const res = await fetch('/api/status', ctrl ? { signal: ctrl.signal } : undefined);
+      const data = await res.json();
+      if (data.server_ip) _serverLanIp = data.server_ip;
+      
+      let secRest = 0;
+      if (dispositivoActual === 'lg') secRest = data.timer_lg;
+      else if (dispositivoActual === 'xiaomi') secRest = data.timer_xiaomi;
+      else secRest = Math.max(data.timer_lg, data.timer_xiaomi);
+
+      const minRest = secRest > 0 ? Math.max(1, Math.round(secRest / 60)) : 0;
+      timerActualMinutos = minRest;
+
+      const estiloDot = (st) => 'inline-block w-2 h-2 rounded-full flex-shrink-0 transition-all duration-300 ' +
+        (st === 'on' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : st === 'booting' ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' : 'bg-slate-400');
+      const estiloBadge = (st) => 'text-[7.5px] px-1 py-0.5 rounded font-mono font-black flex-shrink-0 leading-none ' +
+        (st === 'on' ? 'bg-emerald-600 text-white shadow-sm' : st === 'booting' ? 'bg-amber-500 text-black animate-pulse' : 'bg-slate-300 text-slate-800');
+      const textoBadge = (st) => (st === 'on' ? 'ON' : st === 'booting' ? 'INIC' : 'OFF');
+
+      const lgSt = data.lg_state || (data.lg_online ? 'on' : 'standby');
+      const xmSt = data.xiaomi_state || (data.xiaomi_online ? 'on' : 'standby');
+      _estadoLgCache = lgSt;
+      _estadoXiaomiCache = xmSt;
+
+      const lgDot = document.getElementById('dot-lg');
+      const xmDot = document.getElementById('dot-xiaomi');
+      const lgBadge = document.getElementById('badge-lg');
+      const xmBadge = document.getElementById('badge-xiaomi');
+
+      if (lgDot) lgDot.className = estiloDot(lgSt);
+      if (xmDot) xmDot.className = estiloDot(xmSt);
+      if (lgBadge) { lgBadge.className = estiloBadge(lgSt); lgBadge.textContent = textoBadge(lgSt); }
+      if (xmBadge) { xmBadge.className = estiloBadge(xmSt); xmBadge.textContent = textoBadge(xmSt); }
+
+      const stActual = (dispositivoActual === 'lg') ? lgSt : (dispositivoActual === 'xiaomi' ? xmSt : ((lgSt === 'on' || xmSt === 'on') ? 'on' : (lgSt === 'booting' || xmSt === 'booting' ? 'booting' : 'standby')));
+      const nombreDisp = (dispositivoActual === 'lg') ? 'TELE SALÓN' : (dispositivoActual === 'xiaomi' ? 'TELE CUARTO' : 'AMBAS');
+      actualizarBotonPower(stActual);
+
+      const lcdDot = document.getElementById('lcdPwrDot');
+      if (lcdDot) lcdDot.className = estiloDot(stActual);
+
+      const lcdTarget = document.getElementById('lcdTarget');
+      if (lcdTarget) {
+        if (stActual === 'on') {
+          lcdTarget.textContent = `${nombreDisp} · ON`;
+        } else if (stActual === 'booting') {
+          lcdTarget.textContent = `${nombreDisp} · INIC...`;
+        } else {
+          lcdTarget.textContent = `${nombreDisp} · STANDBY`;
+        }
+      }
+
+      // Sincronizar sliders analógicos con los valores reales de la TV activa (o 0 si está en standby)
+      let volReal = 0;
+      let brilloReal = 0;
+      if (dispositivoActual === 'lg') {
+        volReal = (lgSt === 'on') ? (data.lg_vol ?? 0) : 0;
+        brilloReal = (lgSt === 'on') ? (data.lg_backlight ?? 0) : 0;
+        if (data.lg_audio) {
+          audioEsSharp = (data.lg_audio !== 'tv_speaker');
+          actualizarBotonAudioUI();
+        }
+      } else if (dispositivoActual === 'xiaomi') {
+        volReal = (xmSt === 'on') ? (data.xiaomi_vol ?? 0) : 0;
+        brilloReal = (xmSt === 'on') ? (data.xiaomi_backlight ?? 0) : 0;
+      } else {
+        volReal = Math.max((lgSt === 'on' ? (data.lg_vol ?? 0) : 0), (xmSt === 'on' ? (data.xiaomi_vol ?? 0) : 0));
+        brilloReal = Math.max((lgSt === 'on' ? (data.lg_backlight ?? 0) : 0), (xmSt === 'on' ? (data.xiaomi_backlight ?? 0) : 0));
+        if (lgSt === 'on' && data.lg_audio) {
+          audioEsSharp = (data.lg_audio !== 'tv_speaker');
+          actualizarBotonAudioUI();
+        }
+      }
+
+      const lcdVol = document.getElementById('lcdVol');
+      if (lcdVol) lcdVol.textContent = '🔊 ' + volReal;
+
+      const sliderEnGracia = (Date.now() - _ultimoCambioSliderTs) < 2500;
+      if (!_sliderVolActivo && !sliderEnGracia) {
+        const sVol = document.getElementById('sliderVol');
+        const vLbl = document.getElementById('volVal');
+        if (sVol) sVol.value = volReal;
+        if (vLbl) vLbl.textContent = volReal + '%';
+      }
+      if (!_sliderBrilloActivo && !sliderEnGracia) {
+        const sBrillo = document.getElementById('sliderBrillo');
+        const bLbl = document.getElementById('brilloVal');
+        if (sBrillo) sBrillo.value = brilloReal;
+        if (bLbl) bLbl.textContent = brilloReal + '%';
+      }
+
+      const lcdTimer = document.getElementById('lcdTimer');
+      if (lcdTimer) {
+        if (minRest > 0) {
+          lcdTimer.textContent = '⏱ SLEEP: ' + minRest + 'm';
+          lcdTimer.className = 'cursor-pointer font-black text-amber-500 animate-pulse';
+        } else {
+          lcdTimer.textContent = '⏱ SLEEP: OFF';
+          lcdTimer.className = 'cursor-pointer font-bold opacity-80';
+        }
+      }
+      _fallosSyncConsecutivos = 0;
+    } catch(e) {
+      _fallosSyncConsecutivos++;
+      if (_fallosSyncConsecutivos >= 3) {
+        const lcdTarget = document.getElementById('lcdTarget');
+        if (lcdTarget) lcdTarget.textContent = '⚠️ SERVIDOR DESCONECTADO';
+        const lcdDot = document.getElementById('lcdPwrDot');
+        if (lcdDot) lcdDot.className = 'inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping flex-shrink-0';
+        actualizarStatus('RECONECTANDO SERVIDOR...');
+      }
+    } finally {
+      if (abortTimer) clearTimeout(abortTimer);
+      _syncEnCurso = false;
+    }
+  }
+
+  const NOCHE_CICLOS = [30, 60, 90, 120, 180];
+  let nocheIdx = NOCHE_CICLOS.indexOf(90);
+  function enviarNoche() {
+    nocheIdx = (nocheIdx + 1) % NOCHE_CICLOS.length;
+    const mins = NOCHE_CICLOS[nocheIdx];
+    document.getElementById('lblNocheMins').textContent = '6% • ' + mins + 'm';
+    enviarAccion('noche', String(mins));
+  }
+
+  let _pollInterval = null;
+  function iniciarPoll() {
+    if (_pollInterval) return;
+    _pollInterval = setInterval(sincronizarEstadoServidor, 2500);
+  }
+  function detenerPoll() {
+    if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    document.hidden ? detenerPoll() : (iniciarPoll(), sincronizarEstadoServidor());
+  });
+
+  iniciarPoll();
+  sincronizarEstadoServidor();
+
+  function actualizarStatus(txt) {
+    const el = document.getElementById('statusTxt');
+    if (el) el.textContent = txt.toUpperCase();
+  }
+
+  /* MODAL INVITADOS & COMPARTIR */
+  function _obtenerUrlInvitados() {
+    const h = window.location.hostname;
+    const p = window.location.port ? (':' + window.location.port) : ':8899';
+    if ((h === 'localhost' || h === '127.0.0.1' || !h) && _serverLanIp) {
+      return 'http://' + _serverLanIp + p;
+    }
+    if (window.location.origin && window.location.origin !== 'null' && !window.location.origin.includes('127.0.0.1') && !window.location.origin.includes('localhost')) {
+      return window.location.origin;
+    }
+    const host = _serverLanIp || 'mac-pro-2014.local';
+    return 'http://' + host + p;
+  }
+
+  async function copiarTextoSeguro(texto) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(texto);
+        return true;
+      } catch(e) {}
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch(e) {
+      return false;
+    }
+  }
+
+  function abrirModalInvitados() {
+    vibrar();
+    const url = _obtenerUrlInvitados();
+    const qrImg = document.getElementById('qrInvitadosImg');
+    const qrFb = document.getElementById('qrFallbackUrl');
+    if (qrFb) { qrFb.textContent = url; qrFb.classList.add('hidden'); }
+    if (qrImg) {
+      qrImg.classList.remove('hidden');
+      qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(url);
+    }
+    const lbl = document.getElementById('lblCopiarEnlace');
+    if (lbl) lbl.textContent = 'Copiar Enlace (' + url.replace(/^https?:\/\//, '') + ')';
+    const m = document.getElementById('modalInvitados');
+    if (m) m.classList.remove('hidden');
+  }
+
+  function cerrarModalInvitados() {
+    const m = document.getElementById('modalInvitados');
+    if (m) m.classList.add('hidden');
+  }
+
+  async function compartirNativo() {
+    vibrar();
+    const shareUrl = _obtenerUrlInvitados();
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Mando Universal TV',
+          text: 'Mando de la tele (conéctate primero al Wi-Fi de casa)',
+          url: shareUrl
+        });
+        return;
+      } catch(e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+    copiarEnlaceMando();
+  }
+
+  async function copiarEnlaceMando() {
+    vibrar();
+    const shareUrl = _obtenerUrlInvitados();
+    const ok = await copiarTextoSeguro(shareUrl);
+    const lbl = document.getElementById('lblCopiarEnlace');
+    if (lbl) {
+      const orig = lbl.textContent;
+      lbl.textContent = ok ? '¡Copiado al portapapeles!' : shareUrl;
+      setTimeout(() => lbl.textContent = orig, 2500);
+    }
+  }
+</script>
+</body>
+</html>

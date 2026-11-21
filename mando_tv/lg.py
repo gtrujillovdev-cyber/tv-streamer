@@ -1,0 +1,544 @@
+"""Control de la LG webOS (SSAP por WebSocket)."""
+import asyncio
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+import uuid
+from typing import Any, Dict, Optional
+from .config import Color, IP_LG, LG_CONFIG_PATH, MAC_LG, ROOT_DIR, TIMER_FILE_LG
+from .wol import enviar_wol
+from . import discovery
+
+
+_wol_ts = 0.0
+BOOT_SEGUNDOS = 60  # tiempo máximo que se considera "arrancando" tras un WoL
+
+
+def puerto_abierto(ip: str, puerto: int, timeout: float = 0.3) -> bool:
+    return discovery.puerto_abierto(ip, puerto, timeout=timeout)
+
+
+def estado_lg() -> str:
+    """'on' (SSAP accesible), 'booting' (WoL reciente sin respuesta aún) o 'standby'."""
+    ip = discovery.resolver_ip_lg()
+    if puerto_abierto(ip, 3000):
+        return "on"
+    return "booting" if time.time() - _wol_ts < BOOT_SEGUNDOS else "standby"
+
+
+def esperar_lg(timeout: float = 45.0) -> bool:
+    """Bloquea hasta que la LG acepte conexiones SSAP (tras encenderla por WoL)."""
+    fin = time.time() + timeout
+    while time.time() < fin:
+        ip = discovery.resolver_ip_lg()
+        if puerto_abierto(ip, 3000):
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def redirigir_si_tdt(destino: str = "com.telefonica.app.nux", max_espera: float = 20.0) -> bool:
+    """
+    Comprueba si la LG está en TDT (com.webos.app.livetv) o sin app y la redirige
+    automáticamente a Movistar Plus ('com.telefonica.app.nux') o al Home ('home').
+    Evita que la tele quede atrapada en los canales de TDT al encender.
+    """
+    fin = time.time() + max_espera
+    while time.time() < fin:
+        ip = discovery.resolver_ip_lg()
+        if puerto_abierto(ip, 3000):
+            break
+        time.sleep(0.5)
+    else:
+        return False
+
+    time.sleep(1.0)
+    app_actual = run_lg("status")
+    # Apps de TDT / broadcast habituales en LG webOS
+    apps_tdt = {"com.webos.app.livetv", "com.webos.app.tv", "", "None", "Desconocida"}
+    if app_actual in apps_tdt:
+        print(f"{Color.CYAN}[*] LG 65\": Detectado arranque en TDT ({app_actual}). Redirigiendo automáticamente a {destino}...{Color.END}")
+        if destino == "home":
+            ok = run_lg("tecla", {"tecla": "HOME"})
+        else:
+            ok = run_lg("app", {"id": destino})
+        if ok:
+            print(f"{Color.GREEN}[✓] LG 65\": Redirección completada con éxito (fuera de TDT).{Color.END}")
+        return ok
+    return True
+
+
+def encender_lg(auto_redirect_tdt: bool = True) -> bool:
+    """Despierta la televisión LG 65\" webOS mediante Wake-on-LAN y desvía la TDT si arranca en ella."""
+    global _wol_ts
+    _wol_ts = time.time()
+    ip = discovery.resolver_ip_lg()
+    print(f"{Color.CYAN}[*] Enviando señal Wake-on-LAN a LG 65\" ({MAC_LG} / {ip})...{Color.END}")
+    ok = enviar_wol(MAC_LG)
+    if ok:
+        print(f"{Color.GREEN}[✓] Señal WoL enviada con éxito a LG 65\".{Color.END}")
+        if auto_redirect_tdt:
+            def _async_guard():
+                try:
+                    redirigir_si_tdt()
+                except Exception as ex:
+                    print(f"{Color.YELLOW}[!] Error en auto-redirección anti-TDT: {ex}{Color.END}")
+            threading.Thread(target=_async_guard, name="lg-anti-tdt-guard", daemon=True).start()
+    return ok
+
+
+def cargar_config_lg() -> Dict:
+    ruta = LG_CONFIG_PATH
+    if os.path.exists(ruta):
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"ip": IP_LG, "client_key": ""}
+
+
+PERMISOS = [
+    "LAUNCH", "LAUNCH_WEBAPP", "APP_TO_APP", "CLOSE", "TEST_OPEN", "TEST_PROTECTED",
+    "CONTROL_AUDIO", "CONTROL_DISPLAY", "CONTROL_INPUT_JOYSTICK", "CONTROL_INPUT_MEDIA_RECORDING",
+    "CONTROL_INPUT_MEDIA_PLAYBACK", "CONTROL_INPUT_TV", "CONTROL_POWER", "CONTROL_TV_SCREEN",
+    "CONTROL_TV_STANBY", "CONTROL_MOUSE_AND_KEYBOARD", "CONTROL_INPUT_TEXT",
+    "READ_APP_STATUS", "READ_CURRENT_CHANNEL", "READ_INPUT_DEVICE_LIST", "READ_NETWORK_STATE",
+    "READ_RUNNING_APPS", "READ_TV_CHANNEL_LIST", "READ_POWER_STATE", "READ_COUNTRY_INFO",
+    "READ_SETTINGS", "READ_INSTALLED_APPS", "WRITE_NOTIFICATION_TOAST", "WRITE_NOTIFICATION_ALERT",
+]
+
+MANIFEST = {
+    "manifestVersion": 1,
+    "appVersion": "1.1",
+    "permissions": PERMISOS,
+    "signed": {
+        "created": "20140509",
+        "appId": "com.lge.test",
+        "vendorId": "com.lge",
+        "localizedAppNames": {"": "LG Remote App"},
+        "localizedVendorNames": {"": "LG Electronics"},
+        "permissions": PERMISOS,
+        "serial": "2f930e2d2cfe083771f68e4fe54be0a1",
+    },
+}
+
+# Teclas que se envían por el socket de puntero (latencia mínima, conexión persistente).
+TECLAS_PUNTERO = {
+    "UP", "DOWN", "LEFT", "RIGHT", "ENTER", "BACK", "EXIT", "MENU", "HOME", "INFO",
+    "CHANNELUP", "CHANNELDOWN", "VOLUMEUP", "VOLUMEDOWN", "MUTE",
+    "RED", "GREEN", "YELLOW", "BLUE",
+}
+
+# Teclas con endpoint SSAP nativo.
+TECLAS_SSAP = {
+    "INPUT": ("ssap://system.launcher/open", {"id": "com.webos.app.inputpicker"}),
+    "PLAY": ("ssap://media.controls/play", None),
+    "PAUSE": ("ssap://media.controls/pause", None),
+    "REWIND": ("ssap://media.controls/rewind", None),
+    "FASTFORWARD": ("ssap://media.controls/fastForward", None),
+}
+
+_loop_bg: Optional[asyncio.AbstractEventLoop] = None
+_loop_lock = threading.Lock()
+
+
+def _loop() -> asyncio.AbstractEventLoop:
+    """Bucle asyncio en segundo plano que mantiene viva la conexión con la LG."""
+    global _loop_bg
+    with _loop_lock:
+        if _loop_bg is None:
+            _loop_bg = asyncio.new_event_loop()
+            threading.Thread(target=_loop_bg.run_forever, name="lg-loop", daemon=True).start()
+    return _loop_bg
+
+
+class _Sesion:
+    """Conexión SSAP persistente + socket de puntero persistente."""
+
+    def __init__(self):
+        self.ws = None
+        self.ptr = None
+        self.ptr_t = 0.0
+        self.lock: Optional[asyncio.Lock] = None
+
+    async def cerrar(self):
+        for c in (self.ptr, self.ws):
+            try:
+                if c is not None:
+                    await c.close()
+            except Exception:
+                pass
+        self.ws = self.ptr = None
+
+    async def conectar(self):
+        import websockets
+        ip = discovery.resolver_ip_lg()
+        cfg = cargar_config_lg()
+        ws = await websockets.connect(f"ws://{ip}:3000/", ping_interval=10, ping_timeout=5, open_timeout=3.0)
+        await ws.send(json.dumps({"type": "register", "id": "reg", "payload": {
+            "forcePairing": False, "pairingType": "PROMPT",
+            "client-key": cfg.get("client_key"), "manifest": MANIFEST}}))
+        while True:  # esperar 'registered' (ignora 'response' del aviso de emparejamiento)
+            msg = json.loads(await asyncio.wait_for(ws.recv(), 10))
+            if msg.get("type") == "registered":
+                break
+            if msg.get("type") == "error":
+                await ws.close()
+                raise RuntimeError(msg.get("error"))
+        self.ws = ws
+
+    async def req(self, uri: str, payload: Optional[Dict] = None, timeout: float = 3.0) -> Dict:
+        if self.ws is None:
+            await self.conectar()
+        rid = uuid.uuid4().hex[:8]
+        msg = {"type": "request", "id": rid, "uri": uri}
+        if payload:
+            msg["payload"] = payload
+        await self.ws.send(json.dumps(msg))
+        while True:
+            r = json.loads(await asyncio.wait_for(self.ws.recv(), timeout))
+            if r.get("id") == rid:
+                return r
+
+    async def boton(self, nombre: str):
+        import websockets
+        # El socket de puntero se renueva si lleva inactivo: tras abrir apps/mirroring la LG
+        # lo descarta sin avisar y las escrituras se pierden en silencio.
+        if self.ptr is not None and time.time() - self.ptr_t > 8:
+            try:
+                await self.ptr.close()
+            except Exception:
+                pass
+            self.ptr = None
+        if self.ptr is None:
+            r = await self.req("ssap://com.webos.service.networkinput/getPointerInputSocket")
+            sock = r.get("payload", {}).get("socketPath")
+            if not sock:
+                raise RuntimeError(r.get("error") or "sin socket de puntero")
+            self.ptr = await websockets.connect(sock, ping_interval=None, open_timeout=3.0)
+        await self.ptr.send(f"type:button\nname:{nombre}\n\n")
+        self.ptr_t = time.time()
+
+
+_sesion = _Sesion()
+
+
+def run_lg(accion: str, payload: Optional[Dict] = None) -> bool:
+    """Helper síncrono: despacha a _loop_bg sin crear event loop temporal."""
+    p = payload or {}
+    fut = asyncio.run_coroutine_threadsafe(
+        _con_reintento(lambda: _ejecutar(accion, p)), _loop()
+    )
+    try:
+        return fut.result(timeout=8.0)
+    except Exception as e:
+        print(f"{Color.YELLOW}[!] LG 65\" ({discovery.resolver_ip_lg()}): {accion} falló: {type(e).__name__} {e}{Color.END}")
+        return False
+
+
+async def _con_reintento(fn):
+    """Ejecuta fn(); si la conexión cayó, reconecta y reintenta una vez."""
+    if _sesion.lock is None:
+        _sesion.lock = asyncio.Lock()
+    async with _sesion.lock:
+        try:
+            return await fn()
+        except Exception:
+            await _sesion.cerrar()
+            return await fn()
+
+
+async def _alerta_con_ajuste(mensaje: str, categoria: str, ajustes: Dict):
+    """Aplica ajustes de sistema mediante una alerta con onclose (Luna) y la cierra al instante."""
+    r = await _sesion.req("ssap://system.notifications/createAlert", {
+        "message": mensaje, "modal": False, "buttons": [{"label": "OK", "focus": True}],
+        "onclose": {"uri": "luna://com.webos.settingsservice/setSystemSettings",
+                    "params": {"category": categoria, "settings": ajustes}},
+        "type": "confirm", "isSysReq": True})
+    aid = r.get("payload", {}).get("alertId")
+    if aid:
+        await asyncio.sleep(0.3)
+        await _sesion.req("ssap://system.notifications/closeAlert", {"alertId": aid})
+
+
+async def _ejecutar(accion: str, p: Dict):
+    s = _sesion
+    if accion == "apagar":
+        await s.req("ssap://system/turnOff")
+        print(f"{Color.GREEN}[✓] LG 65\": Apagada correctamente.{Color.END}")
+        return True
+    if accion == "toast":
+        await s.req("ssap://system.notifications/createToast", {"message": p.get("mensaje", "")})
+        return True
+    if accion == "volumen":
+        await s.req("ssap://audio/setVolume", {"volume": p.get("volumen", 15)})
+        return True
+    if accion == "mute":
+        await s.req("ssap://audio/setMute", {"mute": p.get("mute", True)})
+        return True
+    if accion == "vol_up":
+        try:
+            await s.boton("VOLUMEUP")
+        except Exception:
+            await s.req("ssap://audio/volumeUp")
+        return True
+    if accion == "vol_down":
+        try:
+            await s.boton("VOLUMEDOWN")
+        except Exception:
+            await s.req("ssap://audio/volumeDown")
+        return True
+    if accion == "ajustes":
+        await _alerta_con_ajuste(p.get("mensaje", "Aplicando configuración..."),
+                                 p.get("category", "picture"), p.get("settings", {}))
+        return True
+    if accion == "solo_audio":
+        await _alerta_con_ajuste("🌙 Pantalla apagada (Solo Audio). Pulsa cualquier tecla para reactivar.",
+                                 "picture", {"energySaving": "screen_off"})
+        return True
+    if accion == "browser":
+        r = await s.req("ssap://system.launcher/open", {"target": p.get("url", p.get("target", ""))})
+        return r.get("payload", {}).get("returnValue", False)
+    if accion == "app":
+        app_id = p.get("id", "youtube.leanback.v4")
+        params = p.get("params", {})
+        r = await s.req("ssap://system.launcher/open", {"id": app_id, "params": params})
+        ok = r.get("payload", {}).get("returnValue", False)
+        if not ok and app_id in ("com.telefonica.app.nux", "com.movistar.es"):
+            for alt_id in ("movistarplus", "com.telefonica.movistarplus", "com.movistar.es"):
+                if alt_id == app_id:
+                    continue
+                r = await s.req("ssap://system.launcher/open", {"id": alt_id, "params": params})
+                if r.get("payload", {}).get("returnValue", False):
+                    break
+        elif not ok and app_id == "dazn":
+            r = await s.req("ssap://system.launcher/open", {"id": "com.dazn.app", "params": params})
+        return r.get("payload", {}).get("returnValue", True)
+    if accion == "reset_ptr":
+        # Fuerza la recreación del socket de puntero tras un lanzamiento de app.
+        # Cuando webOS cambia de app, invalida el ptr socket sin avisar; los botones
+        # se envían en silencio al contexto anterior y se pierden.
+        if s.ptr is not None:
+            try:
+                await s.ptr.close()
+            except Exception:
+                pass
+            s.ptr = None
+            s.ptr_t = 0.0
+        return True
+    if accion == "audio_output":
+        r = await s.req("ssap://audio/changeSoundOutput", {"output": p.get("output", "external_arc")})
+        return r.get("payload", {}).get("returnValue", True)
+    if accion == "status":
+        r = await s.req("ssap://com.webos.applicationManager/getForegroundAppInfo")
+        return r.get("payload", {}).get("appId", "Desconocida")
+    if accion == "tecla":
+        tecla = p.get("tecla", "ENTER").upper()
+        if tecla in TECLAS_SSAP:
+            uri, pl = TECLAS_SSAP[tecla]
+            r = await s.req(uri, pl)
+            return r.get("type") != "error"
+        await s.boton(tecla)  # puntero: UP/DOWN/LEFT/RIGHT/ENTER/BACK/HOME/MENU/CH±...
+        return True
+    return False
+
+
+async def _leer_info_actual() -> Dict[str, Any]:
+    s = _sesion
+    vol = 0
+    backlight = 0
+    sound_out = "tv_speaker"
+    try:
+        r_vol = await s.req("ssap://audio/getVolume", timeout=1.2)
+        payload = r_vol.get("payload", {})
+        vs = payload.get("volumeStatus", {})
+        vol = vs.get("volume", payload.get("volume", 0))
+        sound_out = vs.get("soundOutput", sound_out)
+    except Exception:
+        pass
+    try:
+        r_pic = await s.req("ssap://settings/getSystemSettings", {"category": "picture", "keys": ["backlight", "brightness"]}, timeout=1.2)
+        settings = r_pic.get("payload", {}).get("settings", {})
+        backlight = int(settings.get("backlight", settings.get("brightness", 0)))
+    except Exception:
+        pass
+    return {"volume": vol, "backlight": backlight, "soundOutput": sound_out}
+
+
+def obtener_info_lg() -> Dict[str, Any]:
+    """Obtiene volumen, retroiluminación y salida de audio actuales de la LG reutilizando el WebSocket."""
+    try:
+        fut = asyncio.run_coroutine_threadsafe(_con_reintento(_leer_info_actual), _loop())
+        return fut.result(timeout=2.0)
+    except Exception:
+        return {"volume": 0, "backlight": 0, "soundOutput": "tv_speaker"}
+
+
+async def enviar_comando_lg(accion: str, payload_extra: Optional[Dict] = None) -> bool:
+    """Envía una acción a la LG reutilizando la conexión persistente (sin re-registro por pulsación)."""
+    try:
+        import websockets  # noqa: F401
+    except ImportError:
+        print(f"{Color.RED}[!] Librería 'websockets' no disponible.{Color.END}")
+        return False
+    p = payload_extra or {}
+    fut = asyncio.run_coroutine_threadsafe(_con_reintento(lambda: _ejecutar(accion, p)), _loop())
+    try:
+        return await asyncio.wrap_future(fut)
+    except Exception as e:
+        print(f"{Color.YELLOW}[!] LG 65\" ({discovery.resolver_ip_lg()}): {accion} falló: {type(e).__name__} {e}{Color.END}")
+        return False
+
+
+def precalentar():
+    """Abre la conexión con la LG al arrancar el servidor para que la primera pulsación sea instantánea."""
+    asyncio.run_coroutine_threadsafe(_con_reintento(lambda: _ejecutar("status", {})), _loop())
+
+
+def programar_temporizador_lg(minutos: float = 90.0):
+    """Lanza un proceso en segundo plano en el Mac para apagar la LG."""
+    cancelar_temporizador_lg(silencioso=True)
+    segundos = int(minutos * 60)
+    
+    cmd = (
+        f"nohup bash -c 'sleep {segundos} && {sys.executable} -c \""
+        f"import sys; sys.path.insert(0, \\\"{ROOT_DIR}\\\"); "
+        f"from mando_tv.lg import apagar_lg; apagar_lg()\"' >/dev/null 2>&1 & echo $!"
+    )
+    try:
+        pid = subprocess.check_output(cmd, shell=True, text=True).strip()
+        with open(TIMER_FILE_LG, "w") as f:
+            f.write(f"{pid}:{segundos}:{int(time.time())}")
+    except Exception as e:
+        print(f"{Color.RED}[!] Error programando timer LG: {e}{Color.END}")
+
+
+def cancelar_temporizador_lg(silencioso: bool = False):
+    if os.path.exists(TIMER_FILE_LG):
+        try:
+            with open(TIMER_FILE_LG, "r") as f:
+                contenido = f.read().strip()
+            pid = contenido.split(":")[0] if ":" in contenido else contenido
+            if pid:
+                subprocess.run(f"pkill -P {pid} 2>/dev/null; kill -9 {pid} 2>/dev/null", shell=True)
+            os.remove(TIMER_FILE_LG)
+            if not silencioso:
+                if estado_lg() == "on":
+                    run_lg("toast", {"mensaje": "⏱️ Temporizador de apagado LG: CANCELADO"})
+                print(f"{Color.GREEN}[✓] LG 65\": Temporizador de apagado cancelado.{Color.END}")
+        except Exception:
+            pass
+    elif not silencioso:
+        print(f"{Color.CYAN}[*] LG 65\": No había temporizadores activos.{Color.END}")
+
+
+def apagar_lg():
+    print(f"{Color.CYAN}[*] Apagando LG 65\" ({discovery.resolver_ip_lg()})...{Color.END}")
+    cancelar_temporizador_lg(silencioso=True)
+    run_lg("apagar")
+
+
+def lg_noche(minutos: float = 90.0):
+    print(f"\n{Color.BOLD}🌙 [LG 65\"] ACTIVANDO MODO NOCHE...{Color.END}")
+    print(f"  • Retroiluminación: {Color.CYAN}6%{Color.END}")
+    print(f"  • Temporizador de apagado: {Color.CYAN}{minutos} minutos ({minutos/60:.1f}h){Color.END}")
+
+    run_lg("ajustes", {
+        "category": "picture",
+        "settings": {
+            "backlight": "6",
+            "brightness": "45",
+            "energySaving": "min"
+        },
+        "mensaje": f"🌙 Modo Noche: Retroiluminación al 6% | Temporizador {minutos}m"
+    })
+    run_lg("toast", {
+        "mensaje": f"🌙 Modo Noche LG: Retroiluminación 6% | Apagado automático en {int(minutos)}m"
+    })
+    programar_temporizador_lg(minutos)
+    print(f"{Color.GREEN}[✓] LG 65\": Retroiluminación reducida al 6% y temporizador de {minutos}m activado.{Color.END}\n")
+
+
+def lg_dia():
+    print(f"\n{Color.BOLD}☀️ [LG 65\"] ACTIVANDO MODO DÍA...{Color.END}")
+    run_lg("ajustes", {
+        "category": "picture",
+        "settings": {
+            "backlight": "100",
+            "brightness": "55",
+            "contrast": "95",
+            "energySaving": "off"
+        },
+        "mensaje": "☀️ Modo Día: Brillo máximo (100%)"
+    })
+    run_lg("toast", {"mensaje": "☀️ Modo Día LG: Brillo al 100% para máxima claridad"})
+    print(f"{Color.GREEN}[✓] LG 65\": Brillo al 100%, contraste 95% y ahorro de energía desactivado.{Color.END}\n")
+
+
+def lg_cine():
+    print(f"\n{Color.BOLD}🎬 [LG 65\"] ACTIVANDO MODO CINE (FILMMAKER MODE D65)...{Color.END}")
+    run_lg("ajustes", {
+        "category": "picture",
+        "settings": {
+            "pictureMode": "filmMaker",
+            "energySaving": "off",
+            "truMotion": "off"
+        },
+        "mensaje": "🎬 Modo Cine: Filmmaker Mode D65 activo"
+    })
+    run_lg("toast", {"mensaje": "🎬 Modo Cine LG: Filmmaker Mode ON | 24fps puras | TruMotion OFF"})
+    print(f"{Color.GREEN}[✓] LG 65\": Filmmaker Mode activo (colores D65 de director, sin suavizado artificial).{Color.END}\n")
+
+
+def lg_juego():
+    print(f"\n{Color.BOLD}🎮 [LG 65\"] ACTIVANDO MODO JUEGO (LATENCIA MÍNIMA ~9ms)...{Color.END}")
+    run_lg("ajustes", {
+        "category": "picture",
+        "settings": {
+            "pictureMode": "game",
+            "energySaving": "off",
+            "truMotion": "off",
+            "gameMode": "on",
+            "hdrGameHGiG": "on"
+        },
+        "mensaje": "🎮 Modo Juego: Game Optimizer ON | ALLM ON | HGiG ON"
+    })
+    run_lg("toast", {"mensaje": "🎮 Modo Juego LG: Input Lag ~9ms | ALLM ON | HGiG ON"})
+    print(f"{Color.GREEN}[✓] LG 65\": Game Optimizer ON (~9ms lag, ALLM para consolas/PC, HGiG calibrado).{Color.END}\n")
+
+
+def lg_descanso():
+    print(f"\n{Color.BOLD}👁️ [LG 65\"] ACTIVANDO MODO DESCANSO VISUAL (CONFORT OCULAR)...{Color.END}")
+    run_lg("ajustes", {
+        "category": "picture",
+        "settings": {
+            "backlight": "30",
+            "brightness": "48",
+            "colorTemperature": "warm50",
+            "energySaving": "med"
+        },
+        "mensaje": "👁️ Confort Ocular: Temperatura Cálida (Warm 50) | Filtro Azul"
+    })
+    run_lg("toast", {"mensaje": "👁️ Confort Ocular LG: Filtro de luz azul activado (Warm 50)"})
+    print(f"{Color.GREEN}[✓] LG 65\": Modo Descanso Visual activado (filtra luz azul y relaja la vista).{Color.END}\n")
+
+
+def lg_solo_audio():
+    print(f"\n{Color.BOLD}📻 [LG 65\"] ACTIVANDO MODO SOLO AUDIO...{Color.END}")
+    run_lg("solo_audio")
+
+
+def lg_volumen(nivel: int):
+    nivel = max(0, min(100, nivel))
+    run_lg("volumen", {"volumen": nivel})
+
+
+def lg_mute(mute: Optional[bool] = None):
+    if mute is None:
+        run_lg("tecla", {"tecla": "MUTE"})
+    else:
+        run_lg("mute", {"mute": mute})

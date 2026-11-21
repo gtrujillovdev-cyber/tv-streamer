@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#07090e" id="metaThemeColor">
+  <title>Atajos de Voz de Siri - Mando TV</title>
+  <script>
+    (function() {
+      try {
+        var modo = localStorage.getItem('mando_theme') || 'auto';
+        var mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+        var sistemaOscuro = mql ? mql.matches : false;
+        var efectivo = (modo === 'auto') ? (sistemaOscuro ? 'dark' : 'light') : modo;
+        document.documentElement.className = 'h-full theme-' + efectivo + (efectivo === 'dark' ? ' dark' : '');
+        var meta = document.getElementById('metaThemeColor');
+        if (meta) meta.setAttribute('content', efectivo === 'light' ? '#f1f5f9' : '#07090e');
+      } catch(e) {}
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = { darkMode: 'class' };
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
+    html.theme-light {
+      --bg-body: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-sub: #334155;
+      --code-bg: #f8fafc;
+      --code-border: #cbd5e1;
+      --code-text: #0f172a;
+      --btn-bg: #e2e8f0;
+      --btn-text: #0f172a;
+    }
+    html.theme-dark {
+      --bg-body: #07090e;
+      --card-bg: rgba(18, 24, 38, 0.75);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-main: #ffffff;
+      --text-sub: #94a3b8;
+      --code-bg: rgba(0, 0, 0, 0.6);
+      --code-border: rgba(255, 255, 255, 0.08);
+      --code-text: #94a3b8;
+      --btn-bg: #1e293b;
+      --btn-text: #ffffff;
+    }
+    body {
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .glass-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+    .code-box {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      color: var(--code-text);
+    }
+    .code-container {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+    }
+  </style>
+</head>
+<body class="min-h-full p-4 flex flex-col justify-between" style="padding-top: max(var(--sat), 16px); padding-bottom: max(var(--sab), 24px);">
+
+  <div class="max-w-md mx-auto w-full space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between pb-2 border-b border-white/10">
+      <a href="/" class="text-sky-400 hover:text-white flex items-center gap-1 text-xs font-bold bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700 active:scale-95 transition-all">
+        <span>↩</span> <span>Mando</span>
+      </a>
+      <h1 class="text-sm font-black flex items-center gap-1.5" style="color: var(--text-main);">
+        <span>🎙️</span> <span>Atajos de Voz de Siri</span>
+      </h1>
+      <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/50">Online</span>
+    </div>
+
+    <!-- Intro -->
+    <div class="glass-card p-3 rounded-2xl space-y-1.5 border border-sky-500/20">
+      <div class="text-xs font-bold text-sky-300">Habla directamente a Siri con manos libres</div>
+      <p class="text-[11px] leading-relaxed" style="color: var(--text-sub);">
+        Dile exactamente lo que quieres a tu iPhone, Apple Watch o HomePod. Pulsa <strong>📲 Añadir</strong> en cualquier atajo para instalarlo en 1 segundo.
+      </p>
+    </div>
+
+    <!-- SECCIÓN VIP: COMANDOS DIRECTOS ESTRELLA -->
+    <div class="p-3.5 rounded-3xl border-2 border-sky-500/50 bg-gradient-to-br from-sky-500/15 via-indigo-600/10 to-transparent shadow-xl space-y-2.5">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">⚡</span>
+        <div>
+          <h2 class="text-xs font-black text-sky-400 uppercase tracking-wide">Comandos Estrella (Habla directa)</h2>
+          <p class="text-[10px] text-slate-300">Todos los canales se sintonizan automáticamente en Movistar Plus+:</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 gap-2 pt-1">
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-sky-500/40">
+          <div class="pr-2">
+            <div class="text-[11.5px] font-black text-white">«Oye Siri, pon Antena 3 en la tele del salón»</div>
+            <div class="text-[9.5px] text-sky-300">Abre Movistar Plus+ y sintoniza Antena 3 (Dial 3)</div>
+          </div>
+          <a href="/api/shortcut?id=lg-antena3" class="px-2.5 py-1.5 bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-[10.5px] font-black shadow flex-shrink-0">📲 Añadir</a>
+        </div>
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-purple-500/40">
+          <div class="pr-2">
+            <div class="text-[11.5px] font-black text-white">«Oye Siri, baja el volumen de la tele del salón»</div>
+            <div class="text-[9.5px] text-purple-300">Baja el volumen en la LG 65" y barra Sharp</div>
+          </div>
+          <a href="/api/shortcut?id=lg-voldown-vol" class="px-2.5 py-1.5 bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-[10.5px] font-black shadow flex-shrink-0">📲 Añadir</a>
+        </div>
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-purple-500/40">
+          <div class="pr-2">
+            <div class="text-[11.5px] font-black text-white">«Oye Siri, sube el volumen de la tele del salón»</div>
+            <div class="text-[9.5px] text-purple-300">Sube el volumen en la LG 65" y barra Sharp</div>
+          </div>
+          <a href="/api/shortcut?id=lg-volup-vol" class="px-2.5 py-1.5 bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-[10.5px] font-black shadow flex-shrink-0">📲 Añadir</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Buscador rápido -->
+    <div class="relative">
+      <input type="text" id="buscador" oninput="filtrarPorTexto()" placeholder="🔍 Buscar canal, app o acción (ej. Netflix, La 1, noche...)" class="w-full py-2 px-3 pl-8 text-xs rounded-xl bg-slate-900/80 border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:border-sky-500">
+      <span class="absolute left-2.5 top-2.5 text-xs text-slate-400">🔍</span>
+    </div>
+
+    <!-- Filtros por Categoría -->
+    <div class="flex flex-wrap gap-1 bg-slate-900/90 p-1.5 rounded-2xl border border-white/5 text-[10px]">
+      <button onclick="filtrarCategoria('todas')" id="cat-todas" class="cat-btn px-2.5 py-1.5 rounded-xl font-bold bg-sky-600 text-white shadow">
+        🔘 Todos
+      </button>
+      <button onclick="filtrarCategoria('salon-canales')" id="cat-salon-canales" class="cat-btn px-2.5 py-1.5 rounded-xl font-bold text-slate-400 hover:text-white">
+        📺 Canales Salón
+      </button>
+      <button onclick="filtrarCategoria('salon-apps')" id="cat-salon-apps" class="cat-btn px-2.5 py-1.5 rounded-xl font-bold text-slate-400 hover:text-white">
+        🍿 Apps Salón
+      </button>
+      <button onclick="filtrarCategoria('salon-ctrl')" id="cat-salon-ctrl" class="cat-btn px-2.5 py-1.5 rounded-xl font-bold text-slate-400 hover:text-white">
+        🛋️ Control Salón
+      </button>
+      <button onclick="filtrarCategoria('cuarto')" id="cat-cuarto" class="cat-btn px-2.5 py-1.5 rounded-xl font-bold text-slate-400 hover:text-white">
+        🛏️ Cuarto (Xiaomi)
+      </button>
+      <button onclick="filtrarCategoria('ambas')" id="cat-ambas" class="cat-btn px-2.5 py-1.5 rounded-xl font-bold text-slate-400 hover:text-white">
+        📺 Ambas
+      </button>
+    </div>
+
+    <!-- Contenedor dinámico de Tarjetas de Atajos -->
+    <div class="space-y-2" id="shortcutsList">
+      <!-- Se puebla dinámicamente vía JavaScript con todas las tarjetas -->
+    </div>
+
+    <!-- Guía Paso a Paso -->
+    <div class="glass-card p-3.5 rounded-2xl space-y-2 border border-white/10">
+      <div class="text-xs font-bold text-white flex items-center gap-1.5">
+        <span>⚙️</span> <span>Instalación en 1 toque en iPhone</span>
+      </div>
+      <ol class="text-[11px] text-slate-300 space-y-1 list-decimal list-inside leading-relaxed">
+        <li>Pulsa el botón verde <strong>📲 Añadir</strong> del atajo que quieras.</li>
+        <li>iOS abrirá la app <strong>Atajos</strong> y te mostrará el botón azul <strong>"Añadir atajo"</strong>.</li>
+        <li>¡Listo! Ya puedes decir en voz alta: <strong class="text-white">«Oye Siri, [nombre del atajo]»</strong>.</li>
+        <li>O si prefieres crearlo manualmente, copia la URL y úsala con la acción <em>"Obtener contenido de la URL"</em>.</li>
+      </ol>
+    </div>
+
+    <div id="toastSiri" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 text-center text-xs font-bold text-emerald-300 bg-emerald-950 border border-emerald-700/80 px-4 py-2 rounded-xl shadow-2xl animate-bounce">
+      URL copiada al portapapeles. ¡Pégala en Atajos!
+    </div>
+  </div>
+
+  <script>
+    // Catálogo completo y limpio de atajos disponibles (Todos los canales en Movistar)
+    const ATAJOS = [
+      // CANALES DE TELEVISIÓN EN EL SALÓN (SIEMPRE EN MOVISTAR PLUS+)
+      { id: "lg-antena3", cat: "salon-canales", icon: "📺", phrase: "Pon Antena 3 en la tele del salón", desc: "Abre Movistar Plus+ y sintoniza Antena 3 (Dial 3)", query: "action=reproducir&platform=movistar&q=Antena+3&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-la1", cat: "salon-canales", icon: "📺", phrase: "Pon La 1 en la tele del salón", desc: "Sintoniza La 1 en Movistar Plus+ (Dial 1)", query: "action=reproducir&platform=movistar&q=La+1&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-la2", cat: "salon-canales", icon: "📺", phrase: "Pon La 2 en la tele del salón", desc: "Sintoniza La 2 en Movistar Plus+ (Dial 2)", query: "action=reproducir&platform=movistar&q=La+2&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-cuatro", cat: "salon-canales", icon: "📺", phrase: "Pon Cuatro en la tele del salón", desc: "Sintoniza Cuatro en Movistar Plus+ (Dial 4)", query: "action=reproducir&platform=movistar&q=Cuatro&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-telecinco", cat: "salon-canales", icon: "📺", phrase: "Pon Telecinco en la tele del salón", desc: "Sintoniza Telecinco en Movistar Plus+ (Dial 5)", query: "action=reproducir&platform=movistar&q=Telecinco&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-lasexta", cat: "salon-canales", icon: "📺", phrase: "Pon La Sexta en la tele del salón", desc: "Sintoniza La Sexta en Movistar Plus+ (Dial 6)", query: "action=reproducir&platform=movistar&q=La+Sexta&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-movistar", cat: "salon-canales", icon: "📺", phrase: "Pon Movistar Plus en la tele del salón", desc: "Sintoniza el canal Movistar Plus+ (Dial 7)", query: "action=reproducir&platform=movistar&q=Movistar+Plus&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-vamos", cat: "salon-canales", icon: "⚽", phrase: "Pon Vamos en la tele del salón", desc: "Sintoniza canal #Vamos (Dial 8)", query: "action=reproducir&platform=movistar&q=Vamos&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-laliga", cat: "salon-canales", icon: "⚽", phrase: "Pon LaLiga en la tele del salón", desc: "Sintoniza canal Movistar LaLiga (Dial 52)", query: "action=reproducir&platform=movistar&q=LaLiga&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-champions", cat: "salon-canales", icon: "🏆", phrase: "Pon la Champions en la tele del salón", desc: "Sintoniza canal Liga de Campeones (Dial 56)", query: "action=reproducir&platform=movistar&q=Champions&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-teledeporte", cat: "salon-canales", icon: "🏃", phrase: "Pon Teledeporte en la tele del salón", desc: "Sintoniza Teledeporte (Dial 64)", query: "action=reproducir&platform=movistar&q=Teledeporte&target=salon", badge: "Salón", color: "sky" },
+
+      // APPS DE STREAMING EN EL SALÓN
+      { id: "lg-nf", cat: "salon-apps", icon: "🍿", phrase: "Pon Netflix en la tele del salón", desc: "Abre la aplicación Netflix en la LG", query: "action=reproducir&platform=netflix&target=salon", badge: "Salón", color: "red" },
+      { id: "lg-yt", cat: "salon-apps", icon: "▶️", phrase: "Pon YouTube en la tele del salón", desc: "Abre la aplicación YouTube en la LG", query: "action=reproducir&platform=youtube&target=salon", badge: "Salón", color: "red" },
+      { id: "lg-spotify", cat: "salon-apps", icon: "🎵", phrase: "Pon Spotify en la tele del salón", desc: "Abre Spotify en la LG para música", query: "action=reproducir&platform=spotify&target=salon", badge: "Salón", color: "emerald" },
+      { id: "lg-prime", cat: "salon-apps", icon: "📦", phrase: "Pon Prime Video en la tele del salón", desc: "Abre Amazon Prime Video en la LG", query: "action=reproducir&platform=prime&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-disney", cat: "salon-apps", icon: "🏰", phrase: "Pon Disney en la tele del salón", desc: "Abre Disney+ en la LG", query: "action=reproducir&platform=disney&target=salon", badge: "Salón", color: "indigo" },
+      { id: "lg-max", cat: "salon-apps", icon: "🎬", phrase: "Pon Max en la tele del salón", desc: "Abre la aplicación Max (HBO)", query: "action=reproducir&platform=max&target=salon", badge: "Salón", color: "purple" },
+      { id: "lg-dazn", cat: "salon-apps", icon: "🥊", phrase: "Pon DAZN en la tele del salón", desc: "Abre DAZN Deportes en la LG", query: "action=reproducir&platform=dazn&target=salon", badge: "Salón", color: "yellow" },
+      { id: "lg-appletv", cat: "salon-apps", icon: "🍏", phrase: "Pon Apple TV en la tele del salón", desc: "Abre Apple TV+ en la LG", query: "action=reproducir&platform=appletv&target=salon", badge: "Salón", color: "slate" },
+
+      // CONTROL TELE DEL SALÓN (LG 65")
+      { id: "lg-voldown-vol", cat: "salon-ctrl", icon: "🔉", phrase: "Baja el volumen de la tele del salón", desc: "Baja el volumen en la LG y la barra Sharp", query: "action=vol_down&target=salon", badge: "Salón", color: "purple" },
+      { id: "lg-volup-vol", cat: "salon-ctrl", icon: "🔊", phrase: "Sube el volumen de la tele del salón", desc: "Sube el volumen en la LG y la barra Sharp", query: "action=vol_up&target=salon", badge: "Salón", color: "purple" },
+      { id: "lg-on", cat: "salon-ctrl", icon: "⚡", phrase: "Enciende la tele del salón", desc: "Despierta la LG por Wake-on-LAN", query: "action=encender&target=salon", badge: "Salón", color: "sky" },
+      { id: "lg-off", cat: "salon-ctrl", icon: "🔌", phrase: "Apaga la tele del salón", desc: "Apagado de la pantalla LG", query: "action=apagar&target=salon", badge: "Salón", color: "rose" },
+      { id: "lg-mute", cat: "salon-ctrl", icon: "🔇", phrase: "Silencia la tele del salón", desc: "Activa o desactiva el mute de sonido", query: "action=mute&target=salon", badge: "Salón", color: "yellow" },
+      { id: "lg-sharp", cat: "salon-ctrl", icon: "📢", phrase: "Audio por barra en el salón", desc: "Conmuta la salida de audio a HDMI ARC Sharp", query: "action=audio_sharp&target=salon", badge: "Salón", color: "emerald" },
+      { id: "lg-noche", cat: "salon-ctrl", icon: "🌙", phrase: "Modo noche en la tele del salón", desc: "Brillo atenuado al 6% y apagado automático en 90 min", query: "action=noche&target=salon", badge: "Salón", color: "indigo" },
+      { id: "lg-dia", cat: "salon-ctrl", icon: "☀️", phrase: "Modo día en la tele del salón", desc: "Brillo estándar y modo imagen nítido", query: "action=dia&target=salon", badge: "Salón", color: "amber" },
+      { id: "lg-cine", cat: "salon-ctrl", icon: "🎥", phrase: "Modo cine en la tele del salón", desc: "Configuración cinemática para películas", query: "action=cine&target=salon", badge: "Salón", color: "fuchsia" },
+
+      // TELE DEL CUARTO (XIAOMI ANDROID TV)
+      { id: "xm-on", cat: "cuarto", icon: "⚡", phrase: "Enciende la tele del cuarto", desc: "Despierta la Xiaomi MiTV por ADB", query: "action=encender&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "xm-off", cat: "cuarto", icon: "🔌", phrase: "Apaga la tele del cuarto", desc: "Standby seguro conservando conexión Wi-Fi", query: "action=apagar&target=cuarto", badge: "Cuarto", color: "rose" },
+      { id: "xm-voldown-vol", cat: "cuarto", icon: "🔉", phrase: "Baja el volumen de la tele del cuarto", desc: "Baja el volumen en la Xiaomi", query: "action=vol_down&target=cuarto", badge: "Cuarto", color: "purple" },
+      { id: "xm-volup-vol", cat: "cuarto", icon: "🔊", phrase: "Sube el volumen de la tele del cuarto", desc: "Sube el volumen en la Xiaomi", query: "action=vol_up&target=cuarto", badge: "Cuarto", color: "purple" },
+      { id: "xm-noche", cat: "cuarto", icon: "🌙", phrase: "Modo noche en la tele del cuarto", desc: "Brillo al mínimo y temporizador 90 minutos", query: "action=noche&target=cuarto", badge: "Cuarto", color: "indigo" },
+      { id: "xm-dia", cat: "cuarto", icon: "☀️", phrase: "Modo día en la tele del cuarto", desc: "Restaura el brillo normal de la tele", query: "action=dia&target=cuarto", badge: "Cuarto", color: "amber" },
+      { id: "xm-antena3", cat: "cuarto", icon: "📺", phrase: "Pon Antena 3 en la tele del cuarto", desc: "Sintoniza Antena 3 en Movistar en la tele del cuarto", query: "action=reproducir&platform=movistar&q=Antena+3&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "xm-la1", cat: "cuarto", icon: "📺", phrase: "Pon La 1 en la tele del cuarto", desc: "Sintoniza La 1 en Movistar en la tele del cuarto", query: "action=reproducir&platform=movistar&q=La+1&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "xm-la2", cat: "cuarto", icon: "📺", phrase: "Pon La 2 en la tele del cuarto", desc: "Sintoniza La 2 en Movistar en la tele del cuarto", query: "action=reproducir&platform=movistar&q=La+2&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "xm-cuatro", cat: "cuarto", icon: "📺", phrase: "Pon Cuatro en la tele del cuarto", desc: "Sintoniza Cuatro en Movistar en la tele del cuarto", query: "action=reproducir&platform=movistar&q=Cuatro&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "xm-telecinco", cat: "cuarto", icon: "📺", phrase: "Pon Telecinco en la tele del cuarto", desc: "Sintoniza Telecinco en Movistar en la tele del cuarto", query: "action=reproducir&platform=movistar&q=Telecinco&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "xm-lasexta", cat: "cuarto", icon: "📺", phrase: "Pon La Sexta en la tele del cuarto", desc: "Sintoniza La Sexta en Movistar en la tele del cuarto", query: "action=reproducir&platform=movistar&q=La+Sexta&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "xm-movistar", cat: "cuarto", icon: "📺", phrase: "Pon Movistar en la tele del cuarto", desc: "Abre Movistar Plus+ en la tele del cuarto", query: "action=reproducir&platform=movistar&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "xm-st", cat: "cuarto", icon: "▶️", phrase: "Pon SmartTube en la tele del cuarto", desc: "Abre SmartTube (YouTube sin publicidad)", query: "action=reproducir&platform=smarttube&target=cuarto", badge: "Cuarto", color: "red" },
+      { id: "xm-yt", cat: "cuarto", icon: "▶️", phrase: "Pon YouTube en la tele del cuarto", desc: "Abre la aplicación oficial de YouTube", query: "action=reproducir&platform=youtube&target=cuarto", badge: "Cuarto", color: "red" },
+      { id: "xm-nf", cat: "cuarto", icon: "🍿", phrase: "Pon Netflix en la tele del cuarto", desc: "Abre Netflix en la tele del cuarto", query: "action=reproducir&platform=netflix&target=cuarto", badge: "Cuarto", color: "red" },
+      { id: "xm-spotify", cat: "cuarto", icon: "🎵", phrase: "Pon Spotify en la tele del cuarto", desc: "Abre Spotify en la tele del cuarto", query: "action=reproducir&platform=spotify&target=cuarto", badge: "Cuarto", color: "emerald" },
+      { id: "xm-prime", cat: "cuarto", icon: "📦", phrase: "Pon Prime Video en la tele del cuarto", desc: "Abre Prime Video en la tele del cuarto", query: "action=reproducir&platform=prime&target=cuarto", badge: "Cuarto", color: "sky" },
+      { id: "xm-disney", cat: "cuarto", icon: "🏰", phrase: "Pon Disney en la tele del cuarto", desc: "Abre Disney+ en la tele del cuarto", query: "action=reproducir&platform=disney&target=cuarto", badge: "Cuarto", color: "indigo" },
+      { id: "xm-max", cat: "cuarto", icon: "🎬", phrase: "Pon Max en la tele del cuarto", desc: "Abre Max (HBO) en la tele del cuarto", query: "action=reproducir&platform=max&target=cuarto", badge: "Cuarto", color: "purple" },
+      { id: "xm-dazn", cat: "cuarto", icon: "🥊", phrase: "Pon DAZN en la tele del cuarto", desc: "Abre DAZN Deportes en la tele del cuarto", query: "action=reproducir&platform=dazn&target=cuarto", badge: "Cuarto", color: "yellow" },
+
+      // BÚSQUEDA POR VOZ DINÁMICA (Ask for Input)
+      { id: "pon-salon-yt", cat: "salon-apps", icon: "🔍", phrase: "Pon en YouTube en el salón", desc: "Siri pregunta qué buscar en YouTube (Salón)", query: "action=reproducir&platform=youtube&target=salon", badge: "Salón", color: "red" },
+      { id: "pon-salon-nf", cat: "salon-apps", icon: "🔍", phrase: "Pon en Netflix en el salón", desc: "Siri pregunta qué buscar en Netflix (Salón)", query: "action=reproducir&platform=netflix&target=salon", badge: "Salón", color: "red" },
+      { id: "pon-salon-prime", cat: "salon-apps", icon: "🔍", phrase: "Pon en Prime Video en el salón", desc: "Siri pregunta qué buscar en Prime Video (Salón)", query: "action=reproducir&platform=prime&target=salon", badge: "Salón", color: "sky" },
+      { id: "pon-salon-disney", cat: "salon-apps", icon: "🔍", phrase: "Pon en Disney en el salón", desc: "Siri pregunta qué buscar en Disney+ (Salón)", query: "action=reproducir&platform=disney&target=salon", badge: "Salón", color: "indigo" },
+      { id: "pon-salon-max", cat: "salon-apps", icon: "🔍", phrase: "Pon en Max en el salón", desc: "Siri pregunta qué buscar en Max (Salón)", query: "action=reproducir&platform=max&target=salon", badge: "Salón", color: "purple" },
+      { id: "pon-cuarto-yt", cat: "cuarto", icon: "🔍", phrase: "Pon en YouTube en el cuarto", desc: "Siri pregunta qué buscar en YouTube (Cuarto)", query: "action=reproducir&platform=youtube&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "pon-cuarto-nf", cat: "cuarto", icon: "🔍", phrase: "Pon en Netflix en el cuarto", desc: "Siri pregunta qué buscar en Netflix (Cuarto)", query: "action=reproducir&platform=netflix&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "pon-cuarto-prime", cat: "cuarto", icon: "🔍", phrase: "Pon en Prime Video en el cuarto", desc: "Siri pregunta qué buscar en Prime Video (Cuarto)", query: "action=reproducir&platform=prime&target=cuarto", badge: "Cuarto", color: "orange" },
+      { id: "pon-cuarto-disney", cat: "cuarto", icon: "🔍", phrase: "Pon en Disney en el cuarto", desc: "Siri pregunta qué buscar en Disney+ (Cuarto)", query: "action=reproducir&platform=disney&target=cuarto", badge: "Cuarto", color: "orange" },
+
+      // AMBAS TELES
+      { id: "ambas-on", cat: "ambas", icon: "⚡", phrase: "Enciende las teles", desc: "Enciende salón y cuarto a la vez", query: "action=encender&target=ambas", badge: "Ambas", color: "emerald" },
+      { id: "ambas-off", cat: "ambas", icon: "🔌", phrase: "Apaga las teles", desc: "Apaga salón y pone el cuarto en standby", query: "action=apagar&target=ambas", badge: "Ambas", color: "rose" },
+      { id: "ambas-pausa", cat: "ambas", icon: "⏯️", phrase: "Pausa la tele", desc: "Alterna Play / Pausa en ambas teles", query: "action=pausa&target=ambas", badge: "Ambas", color: "indigo" },
+      { id: "ambas-status", cat: "ambas", icon: "ℹ️", phrase: "Estado de las teles", desc: "Comprueba en voz alta si están encendidas", query: "action=status", badge: "Ambas", color: "slate" }
+    ];
+
+    let categoriaActual = 'todas';
+
+    function renderizarTarjetas() {
+      const contenedor = document.getElementById('shortcutsList');
+      if (!contenedor) return;
+
+      const host = window.location.host || 'mac-pro-2014.local:8899';
+      const filtro = (document.getElementById('buscador')?.value || '').toLowerCase().trim();
+
+      const items = ATAJOS.filter(item => {
+        const coincideCat = (categoriaActual === 'todas' || item.cat === categoriaActual);
+        if (!coincideCat) return false;
+        if (!filtro) return true;
+        return item.phrase.toLowerCase().includes(filtro) || item.desc.toLowerCase().includes(filtro) || item.id.toLowerCase().includes(filtro);
+      });
+
+      if (items.length === 0) {
+        contenedor.innerHTML = '<div class="glass-card p-6 text-center text-xs text-slate-400 rounded-2xl">No se encontraron atajos con ese filtro.</div>';
+        return;
+      }
+
+      contenedor.innerHTML = items.map(item => {
+        const fullUrl = 'http://' + host + '/api/siri?' + item.query;
+        return `
+          <div class="shortcut-card glass-card p-3 rounded-2xl space-y-2 border border-${item.color}-500/30">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 flex-1 min-w-0">
+                <span class="text-lg flex-shrink-0">${item.icon}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="text-xs font-black text-white truncate">«${item.phrase}»</span>
+                    <span class="text-[9px] px-1.5 py-0.2 bg-slate-800 text-slate-300 rounded border border-slate-700 font-bold">${item.badge}</span>
+                  </div>
+                  <div class="text-[10px] text-${item.color}-300 truncate">${item.desc}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <a href="/api/shortcut?id=${item.id}" class="px-2.5 py-1 bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-[10px] font-bold shadow transition-transform active:scale-95">📲 Añadir</a>
+                <button onclick="probarSiri('/api/siri?${item.query}')" class="px-2 py-1 bg-sky-600 active:bg-sky-700 text-white rounded-xl text-[10px] font-bold shadow transition-transform active:scale-95">
+                  Probar
+                </button>
+              </div>
+            </div>
+            <div class="flex items-center gap-1 code-container p-1 rounded-xl">
+              <input readonly value="${fullUrl}" class="bg-transparent text-[10px] font-mono font-bold flex-1 outline-none px-1 text-slate-400 select-all" onclick="this.select()">
+              <button onclick="copiarTexto('${fullUrl}')" class="text-[9.5px] bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-0.5 rounded-lg font-bold">Copiar</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filtrarCategoria(cat) {
+      categoriaActual = cat;
+      document.querySelectorAll('.cat-btn').forEach(btn => {
+        btn.className = 'cat-btn px-2.5 py-1.5 rounded-xl font-bold text-slate-400 hover:text-white';
+      });
+      const activo = document.getElementById('cat-' + cat);
+      if (activo) {
+        activo.className = 'cat-btn px-2.5 py-1.5 rounded-xl font-bold bg-sky-600 text-white shadow';
+      }
+      renderizarTarjetas();
+    }
+
+    function filtrarPorTexto() {
+      renderizarTarjetas();
+    }
+
+    async function copiarTexto(txt) {
+      let ok = false;
+      if (navigator.clipboard && window.isSecureContext) {
+        try { await navigator.clipboard.writeText(txt); ok = true; } catch (e) {}
+      }
+      if (!ok) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = txt;
+          document.body.appendChild(ta);
+          ta.select();
+          ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (e) {}
+      }
+      const t = document.getElementById('toastSiri');
+      if (t) {
+        t.classList.remove('hidden');
+        setTimeout(() => t.classList.add('hidden'), 2500);
+      }
+    }
+
+    async function probarSiri(endpoint) {
+      try {
+        const res = await fetch(endpoint);
+        const txt = await res.text();
+        if ('speechSynthesis' in window) {
+          const u = new SpeechSynthesisUtterance(txt);
+          u.lang = 'es-ES';
+          window.speechSynthesis.speak(u);
+        } else {
+          alert('Respuesta de Siri: ' + txt);
+        }
+      } catch (e) {
+        alert('Error ejecutando endpoint');
+      }
+    }
+
+    // Inicializar tarjetas al cargar el DOM
+    document.addEventListener('DOMContentLoaded', () => {
+      renderizarTarjetas();
+    });
+  </script>
+</body>
+</html>

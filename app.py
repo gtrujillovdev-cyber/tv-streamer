@@ -6,7 +6,13 @@ from stream_manager import (
     load_config, save_config, get_tailscale_ip, get_local_lan_ip, get_tailscale_peers,
     scan_videos, get_thumbnail, StreamController, clean_title,
     get_history, add_to_history, clear_history, discover_android_tvs,
-    wake_tv, test_tv_connection
+    wake_tv, test_tv_connection,
+    acestream_engine_running, acestream_engine_start,
+    acestream_get_stream_url, acestream_search_channels,
+    acestream_proxy_running, acestream_proxy_stop,
+    lgtv_webos_open_fullscreen, lgtv_webos_open_url, lgtv_load_key,
+    HAS_MANDO_TV, APPS_LG, NOMBRES_PLATAFORMAS,
+    lg_encender, lg_apagar, lg_app, lg_escena, lg_timer_info,
 )
 
 st.set_page_config(
@@ -486,6 +492,173 @@ with st.expander("⚡ Transmitir Archivo Directo (Ruta o Arrastrar)", expanded=F
                 st.rerun()
         else:
             st.error("Ruta no válida o el archivo no existe en el equipo.")
+
+# ==========================================
+# 3b. ACESTREAM — CANALES EN DIRECTO
+# ==========================================
+with st.expander("📡 Acestream — Canales en Directo (MotoGP, F1, Fútbol...)", expanded=False):
+    # Estado del engine
+    engine_ok = acestream_engine_running()
+    col_eng1, col_eng2 = st.columns([3, 1])
+    with col_eng1:
+        if engine_ok:
+            st.markdown(
+                '<span style="color:#22c55e;font-weight:700;">&#11044; Engine Acestream activo</span>',
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                '<span style="color:#ef4444;font-weight:700;">&#11044; Engine Acestream parado</span>',
+                unsafe_allow_html=True
+            )
+    with col_eng2:
+        if not engine_ok:
+            if st.button("Arrancar Engine", key="ace_start_engine", type="primary", use_container_width=True):
+                with st.spinner("Iniciando Docker Acestream..."):
+                    ok, msg = acestream_engine_start()
+                    st.session_state.last_message = ("success" if ok else "error", msg)
+                st.rerun()
+
+    st.divider()
+
+    # Buscador de canales
+    st.markdown("**Buscar canal por nombre** (consulta cestreamid.com):")
+    ace_col_search, ace_col_btn = st.columns([4, 1])
+    with ace_col_search:
+        ace_query = st.text_input(
+            "Canal", label_visibility="collapsed",
+            placeholder="ej: motogp, formula1, laliga...",
+            key="ace_search_input"
+        )
+    with ace_col_btn:
+        do_search = st.button("Buscar", key="ace_do_search", use_container_width=True)
+
+    if do_search and ace_query:
+        with st.spinner(f"Buscando '{ace_query}' en acestreamid.com..."):
+            st.session_state.ace_results = acestream_search_channels(ace_query)
+
+    if "ace_results" in st.session_state and st.session_state.ace_results:
+        results = st.session_state.ace_results
+        st.caption(f"Encontrados **{len(results)}** canales:")
+        for idx, ch in enumerate(results):
+            ch_col1, ch_col2 = st.columns([5, 1])
+            with ch_col1:
+                st.markdown(f"**{ch['name']}**")
+                st.caption(f"`{ch['hash']}`")
+            with ch_col2:
+                if st.button("Ver en TV", key=f"ace_play_result_{idx}", use_container_width=True, type="primary"):
+                    with st.spinner(f"Enviando a {selected_device_name}..."):
+                        ok, res = ctrl.start_acestream(ch["hash"], active_dev_info)
+                        st.session_state.last_message = (
+                            "success", f"Reproduciendo '{ch['name']}' en la TV" if ok else None
+                        ) if ok else ("error", res)
+                    st.rerun()
+    elif "ace_results" in st.session_state and do_search:
+        st.warning("No se encontraron canales. Prueba con otro nombre.")
+
+    st.divider()
+
+    # Hash directo
+    st.markdown("**Hash directo** (pega aquí el ID acestream://...):")
+    ace_hash_col, ace_hash_btn = st.columns([4, 1])
+    with ace_hash_col:
+        ace_direct_hash = st.text_input(
+            "Hash", label_visibility="collapsed",
+            placeholder="2a05a020dfe97aaa0665bb7551022868b2a88b36",
+            key="ace_direct_hash"
+        )
+    with ace_hash_btn:
+        if st.button("Enviar a TV", key="ace_send_direct", use_container_width=True, type="primary"):
+            h = ace_direct_hash.strip()
+            import re as _re
+            if _re.fullmatch(r"[a-f0-9]{40}", h):
+                with st.spinner(f"Enviando a {selected_device_name}..."):
+                    ok, res = ctrl.start_acestream(h, active_dev_info)
+                    st.session_state.last_message = (
+                        ("success", f"Stream lanzado en la TV") if ok else ("error", res)
+                    )
+                st.rerun()
+            else:
+                st.error("Hash inválido. Debe ser una cadena hexadecimal de 40 caracteres.")
+
+    # Ayuda rápida: configurar LG TV WebOS
+    if active_dev_info.get("os_type") != "webos":
+        st.info(
+            "Para enviar directamente a tu LG TV, configura el dispositivo con "
+            "**Modo: webos** e **IP: 192.168.1.191** en el panel lateral."
+        )
+    else:
+        key_exists = bool(lgtv_load_key())
+        if key_exists:
+            st.success("LG TV WebOS pareada correctamente.")
+        else:
+            st.warning("LG TV WebOS no pareada. Ejecuta el script de pairing primero.")
+
+
+# ==========================================
+# 3c. MANDO LG TV (mando_tv)
+# ==========================================
+if active_dev_info.get("os_type") == "webos" and HAS_MANDO_TV:
+    with st.expander("📺 Mando LG TV — Apps, Escenas y Control", expanded=False):
+
+        # --- Encendido / Apagado ---
+        col_on, col_off = st.columns(2)
+        if col_on.button("⚡ Encender LG (WoL)", use_container_width=True, type="primary"):
+            with st.spinner("Enviando Wake-on-LAN..."):
+                ok = lg_encender()
+            st.session_state.last_message = ("success", "Señal WoL enviada") if ok else ("error", "No se pudo encender la TV")
+            st.rerun()
+        if col_off.button("🔌 Apagar LG", use_container_width=True):
+            ok = lg_apagar()
+            st.session_state.last_message = ("success", "TV apagada") if ok else ("error", "No se pudo apagar la TV")
+            st.rerun()
+
+        st.divider()
+
+        # --- Lanzador de Apps ---
+        st.markdown("**Apps de streaming:**")
+        APP_ICONS = {
+            "netflix": "🎬", "youtube": "▶️", "movistar": "📡", "dazn": "⚽",
+            "prime": "📦", "disney": "🏰", "max": "🎥", "spotify": "🎵",
+            "atresplayer": "📺", "rtve": "📻", "twitch": "🎮",
+        }
+        app_keys = [k for k in APPS_LG if k in APP_ICONS]
+        cols_apps = st.columns(4)
+        for i, key in enumerate(app_keys):
+            label = f"{APP_ICONS.get(key, '')} {NOMBRES_PLATAFORMAS.get(key, key.capitalize())}"
+            if cols_apps[i % 4].button(label, key=f"lg_app_{key}", use_container_width=True):
+                with st.spinner(f"Abriendo {NOMBRES_PLATAFORMAS.get(key, key)}..."):
+                    ok = lg_app(key)
+                st.session_state.last_message = (
+                    "success", f"{NOMBRES_PLATAFORMAS.get(key, key)} abierto"
+                ) if ok else ("error", f"No se pudo abrir {key}")
+                st.rerun()
+
+        st.divider()
+
+        # --- Escenas ---
+        st.markdown("**Escenas de imagen:**")
+        ESCENAS = {
+            "noche": ("🌙", "Noche", "Brillo bajo + timer 90 min"),
+            "dia":   ("☀️", "Día",   "Brillo máximo"),
+            "cine":  ("🎬", "Cine",  "Filmmaker / D65"),
+            "juego": ("🎮", "Juego", "Latencia mínima"),
+            "descanso": ("👁️", "Descanso", "Reducción cansancio visual"),
+        }
+        cols_sc = st.columns(5)
+        for i, (key, (ico, nombre, desc)) in enumerate(ESCENAS.items()):
+            if cols_sc[i].button(f"{ico} {nombre}", key=f"lg_sc_{key}", use_container_width=True, help=desc):
+                with st.spinner(f"Aplicando modo {nombre}..."):
+                    ok = lg_escena(key)
+                st.session_state.last_message = (
+                    "success", f"Modo {nombre} activado"
+                ) if ok else ("error", f"No se pudo aplicar modo {nombre}")
+                st.rerun()
+
+        # Timer restante
+        timer_txt = lg_timer_info()
+        if timer_txt:
+            st.caption(f"⏱️ Timer apagado: {timer_txt}")
 
 # ==========================================
 # 4. BARRA DE BÚSQUEDA, FILTRO Y ORDENACIÓN

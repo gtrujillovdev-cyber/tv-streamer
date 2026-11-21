@@ -683,3 +683,465 @@ class StreamController:
             return True, stream_url
         except Exception as e:
             return False, f"Error comunicando con la TV: {e}"
+
+    def start_acestream(self, ace_hash: str, device_info: dict) -> tuple:
+        """Reproduce un canal Acestream en el dispositivo configurado."""
+        if not acestream_engine_running():
+            ok, msg = acestream_engine_start()
+            if not ok:
+                return False, msg
+            time.sleep(4)
+
+        os_type = device_info.get("os_type", "android")
+        host = device_info.get("host", "").strip()
+        mac_ip = get_local_lan_ip()
+
+        if os_type == "webos":
+            # Pipeline HLS: proxy → ffmpeg → .m3u8 → player.html → LG browser
+            ok, result = acestream_hls_start(ace_hash, mac_ip)
+            if not ok:
+                return False, f"Pipeline HLS falló: {result}"
+            return lgtv_webos_open_fullscreen(host, result)
+
+        # Para otros modos, URL directa del engine
+        ok, stream_url = acestream_get_stream_url(ace_hash)
+        if not ok:
+            stream_url = f"http://{mac_ip}:{ACESTREAM_ENGINE_PORT}/ace/getstream?id={ace_hash}"
+
+        if os_type == "cast" and HAS_PYCHROMECAST:
+            try:
+                cast_name = device_info.get("cast_name", "")
+                chromecasts, browser = pychromecast.get_chromecasts(tries=1, timeout=3)
+                target_cc = next((c for c in chromecasts if not cast_name or c.name == cast_name), None)
+                browser.stop_discovery()
+                if not target_cc:
+                    return False, "Dispositivo Cast no encontrado"
+                target_cc.wait()
+                target_cc.media_controller.play_media(stream_url, "video/mp2t")
+                target_cc.media_controller.block_until_active(timeout=5)
+                return True, stream_url
+            except Exception as e:
+                return False, f"Error Cast: {e}"
+
+        # ADB / Android fallback
+        adb_target = f"{host}:5555" if ":5555" not in host else host
+        try:
+            subprocess.run(["adb", "connect", adb_target], capture_output=True, timeout=4)
+            subprocess.run(
+                ["adb", "-s", adb_target, "shell", "am", "start",
+                 "-a", "android.intent.action.VIEW",
+                 "-d", stream_url, "-t", "video/mp2t",
+                 "-f", "0x10000000", "org.videolan.vlc"],
+                capture_output=True, timeout=8
+            )
+            return True, stream_url
+        except Exception as e:
+            return False, f"Error ADB: {e}"
+
+
+# =====================================================
+# ACESTREAM ENGINE + LG TV WEBOS (via mando_tv)
+# =====================================================
+import asyncio
+import urllib.request
+import urllib.parse
+
+ACESTREAM_ENGINE_IMAGE = "jopsis/acestream:latest"
+ACESTREAM_ENGINE_NAME  = "acestream"
+ACESTREAM_ENGINE_PORT  = 6878
+LGTV_KEY_FILE          = Path.home() / ".lgtv_key"
+HLS_DIR                = Path("/tmp/hls_tvstreamer")
+HLS_PORT               = 8890
+
+# --- Inicializar mando_tv con la IP/MAC de la TV webos de config.json ---
+def _init_mando_tv():
+    cfg = load_config()
+    for dev in cfg.get("devices", {}).values():
+        if dev.get("os_type") == "webos":
+            ip  = dev.get("host", "").strip()
+            mac = dev.get("mac", "74:e6:b8:26:02:0e").strip()
+            if ip:
+                os.environ["LG_TV_IP"]  = ip
+            if mac:
+                os.environ["LG_TV_MAC"] = mac
+            break
+    # Apuntar mando_tv al mismo fichero de clave que usamos nosotros (~/.lgtv_key)
+    if str(LGTV_KEY_FILE) not in os.environ.get("LG_CONFIG", ""):
+        os.environ["LG_CONFIG"] = str(LGTV_KEY_FILE)
+
+_init_mando_tv()
+
+try:
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from mando_tv import lg as _lg
+    from mando_tv.wol import enviar_wol as _enviar_wol
+    from mando_tv.streaming import (
+        reproducir_streaming, APPS_LG, NOMBRES_PLATAFORMAS, DIALES_MOVISTAR
+    )
+    from mando_tv.scenes import (
+        modo_noche, modo_dia, modo_cine, modo_juego, modo_descanso,
+        apagar_ambas_tvs, encender_ambas
+    )
+    from mando_tv.timers import obtener_tiempo_restante_timer
+    HAS_MANDO_TV = True
+except Exception as _e:
+    HAS_MANDO_TV = False
+    APPS_LG = {}
+    NOMBRES_PLATAFORMAS = {}
+    DIALES_MOVISTAR = {}
+    print(f"[tv-streamer] mando_tv no disponible: {_e}")
+
+
+def acestream_engine_running() -> bool:
+    """Devuelve True si el contenedor Docker de Acestream está activo."""
+    try:
+        r = subprocess.run(
+            ["docker", "inspect", "--format", "{{.State.Running}}", ACESTREAM_ENGINE_NAME],
+            capture_output=True, text=True, timeout=5
+        )
+        return r.stdout.strip() == "true"
+    except Exception:
+        return False
+
+
+def acestream_engine_start() -> tuple:
+    """Inicia el engine Acestream en Docker. Devuelve (ok, mensaje)."""
+    if acestream_engine_running():
+        return True, "Engine ya en marcha"
+    # Intentar arrancar contenedor existente parado
+    try:
+        subprocess.run(["docker", "start", ACESTREAM_ENGINE_NAME],
+                       capture_output=True, timeout=10)
+        time.sleep(3)
+        if acestream_engine_running():
+            return True, "Engine Acestream iniciado"
+    except Exception:
+        pass
+    # Crear contenedor nuevo
+    try:
+        subprocess.run(
+            ["docker", "run", "-d",
+             "--name", ACESTREAM_ENGINE_NAME,
+             "-p", f"{ACESTREAM_ENGINE_PORT}:{ACESTREAM_ENGINE_PORT}",
+             "--platform", "linux/amd64",
+             ACESTREAM_ENGINE_IMAGE],
+            capture_output=True, timeout=90, check=True
+        )
+        time.sleep(5)
+        return True, "Engine Acestream arrancado"
+    except Exception as e:
+        return False, f"Error iniciando Acestream: {e}"
+
+
+def acestream_get_stream_url(ace_hash: str) -> tuple:
+    """
+    Obtiene la URL HTTP del stream para el hash. Devuelve (ok, url_o_error).
+    La URL apunta a la IP LAN del Mac para que la TV pueda acceder.
+    """
+    mac_ip = get_local_lan_ip()
+    api_url = f"http://127.0.0.1:{ACESTREAM_ENGINE_PORT}/ace/getstream?id={ace_hash}&format=json"
+    try:
+        with urllib.request.urlopen(api_url, timeout=10) as r:
+            data = json.loads(r.read())
+        if data.get("error"):
+            return False, f"Engine error: {data['error']}"
+        url = (data["response"]["playback_url"]
+               .replace("localhost", mac_ip)
+               .replace("127.0.0.1", mac_ip))
+        return True, url
+    except Exception as e:
+        # Fallback: URL directa (el navegador de la TV puede seguir los redirects)
+        return True, f"http://{mac_ip}:{ACESTREAM_ENGINE_PORT}/ace/getstream?id={ace_hash}"
+
+
+def acestream_search_channels(query: str) -> list:
+    """
+    Busca canales en acestreamid.com.
+    Devuelve lista de dicts con {name, hash}.
+    """
+    import html as _html
+    slug = query.lower().strip().replace(" ", "-")
+    urls_to_try = [
+        f"https://acestreamid.com/channel/{slug}",
+        f"https://acestreamid.com/search?q={urllib.parse.quote(query)}",
+    ]
+    results = []
+    seen: set = set()
+
+    for url in urls_to_try:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                body = r.read().decode("utf-8", errors="ignore")
+
+            # Extraer bloques: texto de canal + hash acestream://
+            blocks = re.findall(
+                r'href=["\']acestream://([a-f0-9]{40})["\']',
+                body, re.IGNORECASE
+            )
+            # Obtener nombres de canal del contexto HTML cercano
+            name_blocks = re.findall(
+                r'([\w\s\-/&#;]{2,60})\s*</[^>]+>\s*.*?acestream://([a-f0-9]{40})',
+                body, re.DOTALL | re.IGNORECASE
+            )
+            name_map = {h: _html.unescape(re.sub(r'\s+', ' ', n).strip())
+                        for n, h in name_blocks if h}
+
+            for ace_hash in blocks:
+                if ace_hash not in seen:
+                    seen.add(ace_hash)
+                    name = name_map.get(ace_hash, f"{query.capitalize()} #{len(results)+1}")
+                    results.append({"name": name[:60], "hash": ace_hash})
+
+            # Fallback: extraer todos los hashes de 40 chars si no hubo bloques
+            if not results:
+                all_hashes = list(dict.fromkeys(re.findall(r'[a-f0-9]{40}', body)))
+                title_m = re.search(r'<h[12][^>]*>\s*([^<]{2,60})\s*</h', body)
+                base_name = title_m.group(1).strip() if title_m else query.capitalize()
+                for i, h in enumerate(all_hashes):
+                    if h not in seen:
+                        seen.add(h)
+                        results.append({"name": f"{base_name}" if i == 0 else f"{base_name} #{i+1}", "hash": h})
+        except Exception:
+            continue
+
+    return results
+
+
+_ace_proxy_proc = None  # Proceso del proxy Acestream activo
+ACESTREAM_PROXY_PORT = 8889
+ACESTREAM_PROXY_SCRIPT = Path(__file__).parent / "ace_proxy.py"
+
+
+def acestream_proxy_running(port: int = ACESTREAM_PROXY_PORT) -> bool:
+    """Devuelve True si el puerto del proxy está en uso."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def acestream_proxy_start(ace_hash: str, mac_ip: str, port: int = ACESTREAM_PROXY_PORT) -> tuple:
+    """
+    Arranca el proxy HTTP en background. Devuelve (ok, proxy_url).
+    El proxy sirve el stream de Acestream sin redirects a 127.0.0.1,
+    con Content-Type correcto para que el reproductor nativo de la TV lo abra.
+    """
+    global _ace_proxy_proc
+
+    # Matar proxy anterior si había
+    if _ace_proxy_proc and _ace_proxy_proc.poll() is None:
+        _ace_proxy_proc.terminate()
+        time.sleep(0.5)
+
+    # Matar cualquier proceso huérfano del proxy
+    subprocess.run(["pkill", "-f", "ace_proxy.py"], capture_output=True)
+    time.sleep(0.3)
+
+    try:
+        _ace_proxy_proc = subprocess.Popen(
+            [sys.executable, str(ACESTREAM_PROXY_SCRIPT), ace_hash, str(port)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except Exception as e:
+        return False, f"No se pudo iniciar el proxy: {e}"
+
+    # Esperar a que el proxy esté escuchando (máx 5s)
+    for _ in range(10):
+        time.sleep(0.5)
+        if acestream_proxy_running(port):
+            return True, f"http://{mac_ip}:{port}/stream"
+
+    return False, "Proxy no respondió a tiempo"
+
+
+def acestream_proxy_stop():
+    """Para el proxy Acestream si está en marcha."""
+    global _ace_proxy_proc
+    if _ace_proxy_proc and _ace_proxy_proc.poll() is None:
+        _ace_proxy_proc.terminate()
+        _ace_proxy_proc = None
+    subprocess.run(["pkill", "-f", "ace_proxy.py"], capture_output=True)
+
+
+def lgtv_load_key() -> str:
+    """Carga la client key guardada para la LG TV."""
+    try:
+        with open(LGTV_KEY_FILE) as f:
+            return json.load(f).get("client_key", "")
+    except Exception:
+        return ""
+
+
+# --- Pipeline HLS (ffmpeg → .m3u8 → HTTP server → player.html) ---
+
+_hls_ffmpeg_proc = None
+_hls_http_proc   = None
+
+
+def acestream_hls_stop():
+    """Para el pipeline HLS (ffmpeg + servidor HTTP)."""
+    global _hls_ffmpeg_proc, _hls_http_proc
+    for p in (_hls_ffmpeg_proc, _hls_http_proc):
+        if p and p.poll() is None:
+            p.terminate()
+    _hls_ffmpeg_proc = _hls_http_proc = None
+    subprocess.run(["pkill", "-f", "hls_tvstreamer"], capture_output=True)
+
+
+def acestream_hls_start(ace_hash: str, mac_ip: str) -> tuple:
+    """
+    Arranca el pipeline completo acestream → HLS → HTML player.
+    Pasos:
+      1. Proxy HTTP (ace_proxy.py) sigue los redirects de Acestream.
+      2. ffmpeg convierte MPEG-TS → HLS (.m3u8 + .ts) en /tmp/hls_tvstreamer/.
+      3. Servidor HTTP minimalista sirve el directorio en HLS_PORT.
+      4. Genera player.html con <video src='stream.m3u8'> + JS fullscreen.
+    Devuelve (ok, player_url | error).
+    """
+    global _hls_ffmpeg_proc, _hls_http_proc
+
+    # 1. Proxy
+    if not acestream_proxy_running():
+        ok, _ = acestream_proxy_start(ace_hash, mac_ip)
+        if not ok:
+            return False, "No se pudo iniciar el proxy Acestream"
+
+    # 2. Crear directorio HLS
+    HLS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Matar ffmpeg anterior
+    if _hls_ffmpeg_proc and _hls_ffmpeg_proc.poll() is None:
+        _hls_ffmpeg_proc.terminate()
+        time.sleep(0.5)
+    subprocess.run(["pkill", "-f", "hls_tvstreamer"], capture_output=True)
+    time.sleep(0.3)
+
+    # 3. ffmpeg: proxy → HLS
+    _hls_ffmpeg_proc = subprocess.Popen(
+        [
+            "ffmpeg", "-y",
+            "-user_agent", "Mozilla/5.0",
+            "-i", f"http://127.0.0.1:{ACESTREAM_PROXY_PORT}/stream",
+            "-c:v", "copy", "-c:a", "copy",
+            "-f", "hls",
+            "-hls_time", "2",
+            "-hls_list_size", "5",
+            "-hls_flags", "delete_segments",
+            "-hls_segment_filename", str(HLS_DIR / "seg%03d.ts"),
+            str(HLS_DIR / "stream.m3u8"),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    # 4. player.html
+    player_html = HLS_DIR / "player.html"
+    player_html.write_text(
+        "<!DOCTYPE html><html><head><style>"
+        "* { margin:0; padding:0; box-sizing:border-box; }"
+        "body { background:#000; overflow:hidden; width:100vw; height:100vh; }"
+        "video { width:100vw; height:100vh; object-fit:contain; }"
+        "</style></head><body>"
+        '<video id="v" src="stream.m3u8" autoplay playsinline muted></video>'
+        "<script>"
+        "var v = document.getElementById('v');"
+        "v.muted = false; v.volume = 1.0; v.play().catch(function(){});"
+        "(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen||function(){}).call(document.documentElement);"
+        "v.addEventListener('loadeddata', function(){"
+        "  (v.requestFullscreen||v.webkitRequestFullscreen||function(){}).call(v); v.play();"
+        "});"
+        "</script></body></html>"
+    )
+
+    # 5. Matar servidor HTTP anterior y arrancar nuevo
+    if _hls_http_proc and _hls_http_proc.poll() is None:
+        _hls_http_proc.terminate()
+        time.sleep(0.3)
+
+    _hls_http_proc = subprocess.Popen(
+        [sys.executable, "-m", "http.server", str(HLS_PORT), "--directory", str(HLS_DIR)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    # Esperar a que el .m3u8 aparezca (máx 15s)
+    m3u8 = HLS_DIR / "stream.m3u8"
+    for _ in range(30):
+        time.sleep(0.5)
+        if m3u8.exists() and m3u8.stat().st_size > 0:
+            return True, f"http://{mac_ip}:{HLS_PORT}/player.html"
+
+    return False, "ffmpeg no generó el stream HLS a tiempo"
+
+
+# --- Wrappers públicos WebOS (usan mando_tv internamente) ---
+
+def lgtv_webos_open_fullscreen(tv_ip: str, url: str, client_key: str = None) -> tuple:
+    """Abre una URL en la LG TV a pantalla completa (vía mando_tv / SSAP WebSocket)."""
+    if not HAS_MANDO_TV:
+        return False, "mando_tv no disponible"
+    ok = _lg.run_lg("browser", {"url": url})
+    return (True, f"[browser] {url}") if ok else (False, "LG TV no respondió al comando browser")
+
+
+def lgtv_webos_open_url(tv_ip: str, url: str, client_key: str = None) -> tuple:
+    """Alias de lgtv_webos_open_fullscreen."""
+    return lgtv_webos_open_fullscreen(tv_ip, url, client_key)
+
+
+# --- Wrappers públicos para el panel de control LG en app.py ---
+
+def lg_encender() -> bool:
+    """Enciende la LG TV por Wake-on-LAN."""
+    if not HAS_MANDO_TV:
+        return False
+    return _lg.encender_lg()
+
+
+def lg_apagar() -> bool:
+    """Apaga la LG TV por SSAP."""
+    if not HAS_MANDO_TV:
+        return False
+    return _lg.run_lg("apagar")
+
+
+def lg_app(app_key: str) -> bool:
+    """Abre una app en la LG TV por clave corta (ej. 'netflix', 'youtube')."""
+    if not HAS_MANDO_TV:
+        return False
+    from mando_tv.streaming import APPS_LG
+    app_id = APPS_LG.get(app_key.lower(), app_key)
+    return _lg.run_lg("app", {"id": app_id})
+
+
+def lg_escena(nombre: str, minutos: float = 90.0) -> bool:
+    """Aplica una escena a la LG TV: noche, dia, cine, juego, descanso."""
+    if not HAS_MANDO_TV:
+        return False
+    nombre = nombre.lower()
+    from mando_tv.lg import lg_noche, lg_dia, lg_cine, lg_juego, lg_descanso
+    if nombre == "noche":
+        lg_noche(minutos)
+    elif nombre == "dia":
+        lg_dia()
+    elif nombre == "cine":
+        lg_cine()
+    elif nombre == "juego":
+        lg_juego()
+    elif nombre == "descanso":
+        lg_descanso()
+    else:
+        return False
+    return True
+
+
+def lg_timer_info() -> str:
+    """Devuelve texto con el tiempo restante del temporizador de apagado LG."""
+    if not HAS_MANDO_TV:
+        return ""
+    secs = obtener_tiempo_restante_timer("lg")
+    if not secs:
+        return ""
+    mins = secs // 60
+    return f"{mins} min {secs % 60} s"
