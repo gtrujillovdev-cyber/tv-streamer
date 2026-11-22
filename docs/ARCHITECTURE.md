@@ -73,7 +73,43 @@ libvlc decoder: discarded audio buffer
 
 ---
 
-## 4. Automatización Remota vía ADB
+## 4. Acestream → LG WebOS: Pipeline HLS Completo (nov 2026)
+
+### 4.1 El Problema: Redirects 127.0.0.1
+
+El engine Acestream (Docker `jopsis/acestream:latest`, puerto 6878) devuelve streams mediante una cadena de redirects:
+`/ace/getstream?id=<hash>` → `/ace/r/<hash>` → `/content/...`
+Todos los redirects apuntan a `127.0.0.1`, IP a la que la TV LG no puede acceder (no es el Mac).
+
+### 4.2 Pipeline Implementado
+
+```
+Docker Acestream (6878)
+    └── ace_proxy.py (8889) ← sigue redirects internamente, sirve MPEG-TS con Content-Type correcto
+            └── ffmpeg: MPEG-TS → HLS (.m3u8 + .ts) en /tmp/hls_tvstreamer/
+                    └── python3 -m http.server (8890) sirve HLS_DIR
+                            └── player.html → <video src="stream.m3u8" autoplay> + JS requestFullscreen()
+                                    └── ssap://system.launcher/open {"target": "http://MAC_IP:8890/player.html"}
+                                                └── LG 65UP75 WebOS 6 — pantalla completa automática
+```
+
+### 4.3 Decisiones Técnicas
+
+- **ace_proxy.py vs URL directa:** La TV LG no puede seguir redirects a `127.0.0.1`. El proxy los resuelve en el Mac y sirve los bytes directamente.
+- **HLS sobre MPEG-TS directo:** `com.webos.app.mediadiscovery` (Media Discovery, app nativa LG) no acepta HTTP con redirects ni Content-Type `video/mp2t`. El navegador WebOS sí reproduce `.m3u8` vía `<video>` HTML5.
+- **player.html vs URL raw:** La LG abre el navegador WebOS pero no fuerza pantalla completa con URL raw. El HTML con `requestFullscreen()` en el evento `loadeddata` lo consigue.
+- **`ssap://system.launcher/open` vs `media.viewer/open`:** `media.viewer/open` retorna "Missing or invalid parameters" en WebOS 6 (UP75). `system.launcher/open` con `{"target": url}` funciona en todas las versiones.
+
+### 4.4 Integración mando_tv
+
+La fusión con `mando_tv` (nov 2026) reemplaza la conexión WebSocket propia por `run_lg("browser", {"url": url})` de `_Sesion` persistente, que:
+- Mantiene la conexión SSAP abierta entre comandos (latencia ~10 ms vs ~1.5 s por conexión nueva)
+- Reintenta automáticamente si la conexión cae
+- Resuelve la IP de la LG por MAC cuando cambia por DHCP (`discovery.py`)
+
+---
+
+## 5. Automatización Remota vía ADB
 
 Para conseguir una experiencia 100% *zero-touch* en Android TV:
 
