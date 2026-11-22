@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
+import re
 import socket
 import urllib.parse
 from .config import PUERTO
@@ -212,6 +213,52 @@ class MandoHandler(BaseHTTPRequestHandler):
                 respuesta_siri = self.procesar_comando_siri(action, target, q, platform, val)
 
                 self._enviar_respuesta(respuesta_siri.encode("utf-8"), "text/plain; charset=utf-8")
+
+            elif url.path == "/api/acestream":
+                qs = urllib.parse.parse_qs(url.query)
+                ace_hash = qs.get("hash", [""])[0].strip()
+                slug     = qs.get("slug", [""])[0].strip()
+
+                if not re.match(r'^[a-f0-9]{40}$', ace_hash) and not slug:
+                    self._enviar_respuesta(
+                        json.dumps({"ok": False, "mensaje": "Falta hash (40 hex) o slug"}).encode(),
+                        "application/json"
+                    )
+                    return
+
+                # Respuesta inmediata; el pipeline tarda ~15s en generar el .m3u8
+                self._enviar_respuesta(
+                    json.dumps({"ok": True, "mensaje": "Iniciando pipeline Acestream..."}).encode(),
+                    "application/json"
+                )
+
+                def _run_ace():
+                    from . import acestream as _ace
+                    h = ace_hash
+                    if not h and slug:
+                        results = _ace.search_channels(slug)
+                        if not results:
+                            return
+                        h = results[0]["hash"]
+                    player_url = _ace.hls_start(h)
+                    if player_url:
+                        lg.run_lg("browser", {"url": player_url})
+
+                threading.Thread(target=_run_ace, daemon=True).start()
+
+            elif url.path == "/api/acestream/search":
+                qs = urllib.parse.parse_qs(url.query)
+                query = qs.get("q", [""])[0].strip()
+                if not query:
+                    self._enviar_respuesta(
+                        json.dumps([]).encode(), "application/json"
+                    )
+                    return
+                from . import acestream as _ace
+                results = _ace.search_channels(query)
+                self._enviar_respuesta(
+                    json.dumps(results).encode(), "application/json"
+                )
 
             elif url.path == "/api/shortcut":
                 qs = urllib.parse.parse_qs(url.query)

@@ -855,6 +855,15 @@ def acestream_get_stream_url(ace_hash: str) -> tuple:
         return True, f"http://{mac_ip}:{ACESTREAM_ENGINE_PORT}/ace/getstream?id={ace_hash}"
 
 
+def _ssl_ctx():
+    """Contexto SSL sin verificación de certificado (necesario en macOS sin certifi)."""
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def acestream_search_channels(query: str) -> list:
     """
     Busca canales en acestreamid.com.
@@ -864,7 +873,7 @@ def acestream_search_channels(query: str) -> list:
     slug = query.lower().strip().replace(" ", "-")
     urls_to_try = [
         f"https://acestreamid.com/channel/{slug}",
-        f"https://acestreamid.com/search?q={urllib.parse.quote(query)}",
+        f"https://acestreamid.com/channel/{query.lower().strip().replace(' ', '')}",
     ]
     results = []
     seen: set = set()
@@ -872,7 +881,7 @@ def acestream_search_channels(query: str) -> list:
     for url in urls_to_try:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=8) as r:
+            with urllib.request.urlopen(req, timeout=8, context=_ssl_ctx()) as r:
                 body = r.read().decode("utf-8", errors="ignore")
 
             # Extraer bloques: texto de canal + hash acestream://
@@ -907,6 +916,69 @@ def acestream_search_channels(query: str) -> list:
             continue
 
     return results
+
+
+# --- Canales favoritos Acestream ---
+
+ACE_CHANNELS_FILE = Path(__file__).parent / "canales_acestream.json"
+
+_ACE_CHANNELS_DEFAULT = [
+    {"name": "MotoGP",        "slug": "motogp",        "icon": "🏍️"},
+    {"name": "Eurosport 1",   "slug": "eurosport",     "icon": "🏃"},
+    {"name": "Eurosport 2",   "slug": "eurosport-2",   "icon": "⛷️"},
+    {"name": "beIN Sports",   "slug": "bein-sports",   "icon": "⚽"},
+]
+
+
+def load_ace_channels() -> list:
+    """Carga la lista de canales favoritos desde disco."""
+    try:
+        with open(ACE_CHANNELS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return list(_ACE_CHANNELS_DEFAULT)
+
+
+def save_ace_channels(channels: list):
+    """Guarda la lista de canales favoritos."""
+    with open(ACE_CHANNELS_FILE, "w", encoding="utf-8") as f:
+        json.dump(channels, f, ensure_ascii=False, indent=2)
+
+
+def add_ace_channel(name: str, icon: str = "📺", slug: str = "", hash_: str = "") -> list:
+    """Añade un canal favorito. Acepta slug (acestreamid.com) o hash directo."""
+    channels = load_ace_channels()
+    entry: dict = {"name": name, "icon": icon}
+    if hash_:
+        entry["hash"] = hash_
+    elif slug:
+        entry["slug"] = slug
+    channels.append(entry)
+    save_ace_channels(channels)
+    return channels
+
+
+def remove_ace_channel(index: int) -> list:
+    """Elimina el canal en la posición dada."""
+    channels = load_ace_channels()
+    if 0 <= index < len(channels):
+        channels.pop(index)
+        save_ace_channels(channels)
+    return channels
+
+
+def resolve_ace_channel(channel: dict) -> list:
+    """
+    Dado un canal favorito (slug o hash directo), devuelve lista de {name, hash}.
+    Si tiene hash directo lo devuelve de inmediato.
+    Si tiene slug, busca en acestreamid.com.
+    """
+    if channel.get("hash"):
+        return [{"name": channel["name"], "hash": channel["hash"]}]
+    slug = channel.get("slug", "")
+    if not slug:
+        return []
+    return acestream_search_channels(slug)
 
 
 _ace_proxy_proc = None  # Proceso del proxy Acestream activo

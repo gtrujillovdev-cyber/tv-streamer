@@ -13,6 +13,8 @@ from stream_manager import (
     lgtv_webos_open_fullscreen, lgtv_webos_open_url, lgtv_load_key,
     HAS_MANDO_TV, APPS_LG, NOMBRES_PLATAFORMAS,
     lg_encender, lg_apagar, lg_app, lg_escena, lg_timer_info,
+    load_ace_channels, save_ace_channels, add_ace_channel,
+    remove_ace_channel, resolve_ace_channel,
 )
 
 st.set_page_config(
@@ -497,20 +499,14 @@ with st.expander("⚡ Transmitir Archivo Directo (Ruta o Arrastrar)", expanded=F
 # 3b. ACESTREAM — CANALES EN DIRECTO
 # ==========================================
 with st.expander("📡 Acestream — Canales en Directo (MotoGP, F1, Fútbol...)", expanded=False):
+
     # Estado del engine
     engine_ok = acestream_engine_running()
     col_eng1, col_eng2 = st.columns([3, 1])
     with col_eng1:
-        if engine_ok:
-            st.markdown(
-                '<span style="color:#22c55e;font-weight:700;">&#11044; Engine Acestream activo</span>',
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                '<span style="color:#ef4444;font-weight:700;">&#11044; Engine Acestream parado</span>',
-                unsafe_allow_html=True
-            )
+        color_eng = "#22c55e" if engine_ok else "#ef4444"
+        label_eng = "Engine Acestream activo" if engine_ok else "Engine Acestream parado"
+        st.markdown(f'<span style="color:{color_eng};font-weight:700;">&#11044; {label_eng}</span>', unsafe_allow_html=True)
     with col_eng2:
         if not engine_ok:
             if st.button("Arrancar Engine", key="ace_start_engine", type="primary", use_container_width=True):
@@ -521,75 +517,136 @@ with st.expander("📡 Acestream — Canales en Directo (MotoGP, F1, Fútbol...)
 
     st.divider()
 
-    # Buscador de canales
-    st.markdown("**Buscar canal por nombre** (consulta cestreamid.com):")
+    # ---- CANALES FAVORITOS ----
+    ace_channels = load_ace_channels()
+    st.markdown("**Canales favoritos:**")
+
+    if ace_channels:
+        # Si hay resultados pendientes de un favorito, mostrarlos primero
+        if "ace_fav_results" in st.session_state and st.session_state.ace_fav_results:
+            fav_results = st.session_state.ace_fav_results
+            fav_name = st.session_state.get("ace_fav_name", "Canal")
+            st.caption(f"Señales disponibles para **{fav_name}** — elige cuál poner:")
+            for idx, ch in enumerate(fav_results[:6]):
+                r_col1, r_col2, r_col3 = st.columns([4, 1, 1])
+                r_col1.markdown(f"**{ch['name']}**")
+                r_col1.caption(f"`{ch['hash']}`")
+                if r_col2.button("Ver en TV", key=f"ace_fav_res_{idx}", use_container_width=True, type="primary"):
+                    with st.spinner("Enviando a la TV..."):
+                        ok, res = ctrl.start_acestream(ch["hash"], active_dev_info)
+                        st.session_state.last_message = ("success", f"Reproduciendo '{ch['name']}'") if ok else ("error", res)
+                    st.session_state.ace_fav_results = []
+                    st.rerun()
+                if r_col3.button("Guardar", key=f"ace_fav_save_{idx}", use_container_width=True):
+                    add_ace_channel(ch["name"][:30], "📺", hash_=ch["hash"])
+                    st.session_state.last_message = ("success", f"'{ch['name']}' guardado en favoritos")
+                    st.session_state.ace_fav_results = []
+                    st.rerun()
+            if st.button("✕ Cancelar", key="ace_fav_cancel"):
+                st.session_state.ace_fav_results = []
+                st.rerun()
+            st.divider()
+
+        # Grid de favoritos
+        fav_cols = st.columns(4)
+        for i, ch in enumerate(ace_channels):
+            ico  = ch.get("icon", "📺")
+            name = ch.get("name", "?")
+            with fav_cols[i % 4]:
+                if st.button(f"{ico} {name}", key=f"ace_fav_{i}", use_container_width=True):
+                    if ch.get("hash"):
+                        with st.spinner(f"Enviando {name} a la TV..."):
+                            ok, res = ctrl.start_acestream(ch["hash"], active_dev_info)
+                            st.session_state.last_message = ("success", f"Reproduciendo '{name}'") if ok else ("error", res)
+                        st.rerun()
+                    elif ch.get("slug"):
+                        with st.spinner(f"Buscando señales de {name}..."):
+                            results = resolve_ace_channel(ch)
+                        if len(results) == 1:
+                            with st.spinner(f"Enviando {name} a la TV..."):
+                                ok, res = ctrl.start_acestream(results[0]["hash"], active_dev_info)
+                                st.session_state.last_message = ("success", f"Reproduciendo '{name}'") if ok else ("error", res)
+                            st.rerun()
+                        elif results:
+                            st.session_state.ace_fav_results = results
+                            st.session_state.ace_fav_name = name
+                            st.rerun()
+                        else:
+                            st.session_state.last_message = ("error", f"No se encontraron señales para '{name}'")
+                            st.rerun()
+
+        # Eliminar favorito
+        with st.expander("Gestionar favoritos", expanded=False):
+            for i, ch in enumerate(ace_channels):
+                g_col1, g_col2 = st.columns([5, 1])
+                g_col1.caption(f"{ch.get('icon','📺')} **{ch.get('name','?')}** — {'slug: '+ch['slug'] if ch.get('slug') else 'hash: '+ch.get('hash','')[:12]+'...'}")
+                if g_col2.button("🗑️", key=f"ace_del_{i}"):
+                    remove_ace_channel(i)
+                    st.rerun()
+    else:
+        st.caption("No hay canales favoritos. Añade uno abajo.")
+
+    st.divider()
+
+    # ---- BUSCADOR ----
+    st.markdown("**Buscar canal** (acestreamid.com):")
     ace_col_search, ace_col_btn = st.columns([4, 1])
     with ace_col_search:
-        ace_query = st.text_input(
-            "Canal", label_visibility="collapsed",
-            placeholder="ej: motogp, formula1, laliga...",
-            key="ace_search_input"
-        )
+        ace_query = st.text_input("Canal", label_visibility="collapsed",
+                                   placeholder="motogp, eurosport, bein-sports...",
+                                   key="ace_search_input")
     with ace_col_btn:
         do_search = st.button("Buscar", key="ace_do_search", use_container_width=True)
 
     if do_search and ace_query:
-        with st.spinner(f"Buscando '{ace_query}' en acestreamid.com..."):
+        with st.spinner(f"Buscando '{ace_query}'..."):
             st.session_state.ace_results = acestream_search_channels(ace_query)
+            st.session_state.ace_results_query = ace_query
 
-    if "ace_results" in st.session_state and st.session_state.ace_results:
+    if st.session_state.get("ace_results"):
         results = st.session_state.ace_results
-        st.caption(f"Encontrados **{len(results)}** canales:")
-        for idx, ch in enumerate(results):
-            ch_col1, ch_col2 = st.columns([5, 1])
-            with ch_col1:
-                st.markdown(f"**{ch['name']}**")
-                st.caption(f"`{ch['hash']}`")
-            with ch_col2:
-                if st.button("Ver en TV", key=f"ace_play_result_{idx}", use_container_width=True, type="primary"):
-                    with st.spinner(f"Enviando a {selected_device_name}..."):
-                        ok, res = ctrl.start_acestream(ch["hash"], active_dev_info)
-                        st.session_state.last_message = (
-                            "success", f"Reproduciendo '{ch['name']}' en la TV" if ok else None
-                        ) if ok else ("error", res)
-                    st.rerun()
+        st.caption(f"**{len(results)}** señales encontradas para '{st.session_state.get('ace_results_query','')}':")
+        for idx, ch in enumerate(results[:8]):
+            ch_col1, ch_col2, ch_col3 = st.columns([4, 1, 1])
+            ch_col1.markdown(f"**{ch['name']}**")
+            ch_col1.caption(f"`{ch['hash']}`")
+            if ch_col2.button("Ver en TV", key=f"ace_play_{idx}", use_container_width=True, type="primary"):
+                with st.spinner("Enviando a la TV..."):
+                    ok, res = ctrl.start_acestream(ch["hash"], active_dev_info)
+                    st.session_state.last_message = ("success", f"Reproduciendo '{ch['name']}'") if ok else ("error", res)
+                st.rerun()
+            if ch_col3.button("★ Guardar", key=f"ace_save_{idx}", use_container_width=True):
+                slug = st.session_state.get("ace_results_query", "").lower().strip().replace(" ", "-")
+                add_ace_channel(st.session_state.get("ace_results_query", ch["name"]).capitalize(),
+                                "📺", slug=slug)
+                st.session_state.last_message = ("success", "Canal añadido a favoritos")
+                st.rerun()
     elif "ace_results" in st.session_state and do_search:
-        st.warning("No se encontraron canales. Prueba con otro nombre.")
+        st.warning("No se encontraron señales. Prueba con el slug exacto (ej: motogp, eurosport).")
 
     st.divider()
 
-    # Hash directo
-    st.markdown("**Hash directo** (pega aquí el ID acestream://...):")
+    # ---- HASH DIRECTO ----
+    st.markdown("**Hash directo** (acestream://...):")
     ace_hash_col, ace_hash_btn = st.columns([4, 1])
     with ace_hash_col:
-        ace_direct_hash = st.text_input(
-            "Hash", label_visibility="collapsed",
-            placeholder="2a05a020dfe97aaa0665bb7551022868b2a88b36",
-            key="ace_direct_hash"
-        )
+        ace_direct_hash = st.text_input("Hash", label_visibility="collapsed",
+                                         placeholder="2a05a020dfe97aaa0665bb7551022868b2a88b36",
+                                         key="ace_direct_hash")
     with ace_hash_btn:
         if st.button("Enviar a TV", key="ace_send_direct", use_container_width=True, type="primary"):
-            h = ace_direct_hash.strip()
             import re as _re
+            h = ace_direct_hash.strip()
             if _re.fullmatch(r"[a-f0-9]{40}", h):
-                with st.spinner(f"Enviando a {selected_device_name}..."):
+                with st.spinner("Enviando a la TV..."):
                     ok, res = ctrl.start_acestream(h, active_dev_info)
-                    st.session_state.last_message = (
-                        ("success", f"Stream lanzado en la TV") if ok else ("error", res)
-                    )
+                    st.session_state.last_message = ("success", "Stream lanzado en la TV") if ok else ("error", res)
                 st.rerun()
             else:
-                st.error("Hash inválido. Debe ser una cadena hexadecimal de 40 caracteres.")
+                st.error("Hash inválido (debe ser 40 caracteres hexadecimales).")
 
-    # Ayuda rápida: configurar LG TV WebOS
-    if active_dev_info.get("os_type") != "webos":
-        st.info(
-            "Para enviar directamente a tu LG TV, configura el dispositivo con "
-            "**Modo: webos** e **IP: 192.168.1.191** en el panel lateral."
-        )
-    else:
-        key_exists = bool(lgtv_load_key())
-        if key_exists:
+    if active_dev_info.get("os_type") == "webos":
+        if lgtv_load_key():
             st.success("LG TV WebOS pareada correctamente.")
         else:
             st.warning("LG TV WebOS no pareada. Ejecuta el script de pairing primero.")
